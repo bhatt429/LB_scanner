@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>L&B Label Scanner</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700;900&display=swap');
 
@@ -116,6 +116,12 @@
   #interactive { width: 100% !important; height: 100% !important; }
   #interactive video { width: 100% !important; height: 100% !important; object-fit: cover; }
   #interactive canvas { display: none; }
+  /* html5-qrcode overrides */
+  #qr-reader { border: none !important; padding: 0 !important; width: 100% !important; }
+  #qr-reader video { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 0 !important; }
+  #qr-reader img { display: none !important; }
+  #qr-reader__scan_region { padding: 0 !important; }
+  #qr-reader__dashboard { display: none !important; }
 
   .scan-overlay {
     position: absolute; inset: 0;
@@ -337,7 +343,7 @@
 <div id="page-scanner" class="page active">
 
   <div id="scanner-wrap" class="scanner-wrap">
-    <div id="interactive" class="viewport"></div>
+    <div id="qr-reader"></div>
     <div class="scan-overlay">
       <div class="scan-frame"><span></span><div class="scan-line"></div></div>
     </div>
@@ -467,38 +473,60 @@ function showResult(code) {
 }
 
 // ─── Scanner ───────────────────────────────────────────
+let html5QrCode = null;
+
 function startScanner() {
+  if (typeof Html5Qrcode === 'undefined') {
+    showToast('Scanner library not loaded — check internet connection', 'warn');
+    return;
+  }
   const wrap = document.getElementById('scanner-wrap');
   wrap.style.display = 'block';
   document.getElementById('start-btn').style.display = 'none';
   document.getElementById('stop-btn').style.display = 'block';
 
-  Quagga.init({
-    inputStream: {
-      name: 'Live', type: 'LiveStream',
-      target: document.querySelector('#interactive'),
-      constraints: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } }
+  html5QrCode = new Html5Qrcode('qr-reader');
+
+  const config = {
+    fps: 10,
+    qrbox: { width: 250, height: 150 },
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39
+    ]
+  };
+
+  html5QrCode.start(
+    { facingMode: 'environment' },
+    config,
+    (decodedText) => {
+      const now = Date.now();
+      if (decodedText === lastScanned && now - lastScanTime < 3000) return;
+      lastScanned = decodedText;
+      lastScanTime = now;
+      showResult(decodedText);
     },
-    decoder: { readers: ['ean_reader','upc_reader','code_128_reader','code_39_reader'] },
-    locate: true, numOfWorkers: 2, frequency: 10,
-  }, err => {
-    if (err) { showToast('Camera error: ' + err.message, 'warn'); stopScanner(); return; }
-    Quagga.start();
-    scannerRunning = true;
+    (errorMessage) => { /* scan errors are normal, ignore */ }
+  ).catch(err => {
+    showToast('Camera error: ' + err, 'warn');
+    stopScanner();
   });
 
-  Quagga.offDetected();
-  Quagga.onDetected(data => {
-    const code = data.codeResult.code;
-    const now = Date.now();
-    if (code === lastScanned && now - lastScanTime < 3000) return;
-    lastScanned = code; lastScanTime = now;
-    showResult(code);
-  });
+  scannerRunning = true;
 }
 
 function stopScanner() {
-  if (scannerRunning) { Quagga.stop(); scannerRunning = false; }
+  if (html5QrCode && scannerRunning) {
+    html5QrCode.stop().then(() => {
+      html5QrCode.clear();
+      html5QrCode = null;
+    }).catch(() => {});
+    scannerRunning = false;
+  }
   document.getElementById('scanner-wrap').style.display = 'none';
   document.getElementById('start-btn').style.display = 'block';
   document.getElementById('stop-btn').style.display = 'none';
