@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Barcode Scanner Test</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #111;
+    color: #fff;
+    font-family: 'Courier New', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px;
+  }
+
+  h1 {
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #F0B722;
+    margin-bottom: 24px;
+  }
+
+  #qr-reader {
+    width: 100% !important;
+    max-width: 400px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid #333;
+  }
+  #qr-reader video { width: 100% !important; object-fit: cover !important; }
+  #qr-reader img { display: none !important; }
+  #qr-reader__scan_region { padding: 0 !important; }
+  #qr-reader__dashboard { display: none !important; }
+
+  #start-btn {
+    margin: 20px 0;
+    padding: 14px 32px;
+    background: #F0B722;
+    color: #111;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    text-transform: uppercase;
+    width: 100%;
+    max-width: 400px;
+  }
+
+  #stop-btn {
+    margin: 20px 0;
+    padding: 14px 32px;
+    background: #c0182e;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    font-weight: bold;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    text-transform: uppercase;
+    width: 100%;
+    max-width: 400px;
+    display: none;
+  }
+
+  #result-box {
+    width: 100%;
+    max-width: 400px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 20px;
+    display: none;
+  }
+
+  #result-box.show { display: block; }
+
+  .result-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: #555;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  #result-code {
+    font-size: 28px;
+    font-weight: bold;
+    color: #F0B722;
+    word-break: break-all;
+    margin-bottom: 8px;
+  }
+
+  #result-format {
+    font-size: 11px;
+    color: #555;
+  }
+
+  #log {
+    width: 100%;
+    max-width: 400px;
+    margin-top: 20px;
+    font-size: 11px;
+    color: #444;
+    text-align: left;
+  }
+
+  .log-entry {
+    border-bottom: 1px solid #222;
+    padding: 6px 0;
+    color: #666;
+  }
+  .log-entry span { color: #F0B722; }
+</style>
+</head>
+<body>
+
+<h1>📷 Barcode Scanner Test</h1>
+
+<div id="qr-reader"></div>
+
+<button id="start-btn" onclick="startScanner()">▶ Start Camera</button>
+<button id="stop-btn" onclick="stopScanner()">■ Stop</button>
+
+<div id="result-box">
+  <div class="result-label">Last Scanned</div>
+  <div id="result-code">—</div>
+  <div id="result-format"></div>
+</div>
+
+<div id="log"></div>
+
+<script>
+let html5QrCode = null;
+let running = false;
+let scanCount = 0;
+
+function startScanner() {
+  if (typeof Html5Qrcode === 'undefined') {
+    alert('Library not loaded — check internet connection');
+    return;
+  }
+
+  document.getElementById('start-btn').style.display = 'none';
+  document.getElementById('stop-btn').style.display = 'block';
+
+  html5QrCode = new Html5Qrcode('qr-reader');
+
+  html5QrCode.start(
+    { facingMode: 'environment' },
+    {
+      fps: 15,
+      qrbox: { width: 280, height: 120 },
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.ITF
+      ]
+    },
+    (decodedText, decodedResult) => {
+      scanCount++;
+      const format = decodedResult?.result?.format?.formatName || 'unknown';
+
+      // Show result
+      document.getElementById('result-box').className = 'result-box show';
+      document.getElementById('result-code').textContent = decodedText;
+      document.getElementById('result-format').textContent = 'Format: ' + format + ' · Length: ' + decodedText.length + ' digits';
+
+      // Log it
+      const log = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = 'log-entry';
+      entry.innerHTML = '#' + scanCount + ' &nbsp;<span>' + decodedText + '</span> &nbsp;(' + format + ')';
+      log.prepend(entry);
+    },
+    () => { /* ignore scan errors */ }
+  ).catch(err => {
+    alert('Camera error: ' + err);
+    stopScanner();
+  });
+
+  running = true;
+}
+
+function stopScanner() {
+  if (html5QrCode && running) {
+    html5QrCode.stop().then(() => {
+      html5QrCode.clear();
+      html5QrCode = null;
+    }).catch(() => {});
+    running = false;
+  }
+  document.getElementById('start-btn').style.display = 'block';
+  document.getElementById('stop-btn').style.display = 'none';
+}
+</script>
+</body>
+</html>
