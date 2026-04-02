@@ -192,27 +192,6 @@
   }
   .btn-small.undo { border-color: var(--orange); color: var(--orange); }
   .btn-small:active { background: var(--cream); }
-
-  /* MANUAL PANEL */
-  .manual-panel {
-    display: none; background: var(--white); border-radius: 12px;
-    padding: 12px; margin-bottom: 10px; border: 2px solid var(--border);
-  }
-  .manual-panel.open { display: block; }
-  .manual-row { display: flex; gap: 8px; }
-  .manual-input {
-    flex: 1; padding: 12px 14px; border-radius: 10px;
-    border: 2px solid var(--border); background: var(--cream);
-    color: var(--text); font-family: "Space Mono", monospace; font-size: 14px;
-    outline: none;
-  }
-  .manual-input:focus { border-color: var(--maroon); }
-  .manual-go {
-    padding: 12px 18px; border-radius: 10px; border: none;
-    background: var(--maroon); color: #fff;
-    font-family: "DM Sans", sans-serif; font-weight: 700; font-size: 15px; cursor: pointer;
-  }
-
   /* PRODUCT LIST */
   .list-header {
     font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
@@ -354,18 +333,7 @@
 
     <!-- SECONDARY ACTIONS -->
     <div class="secondary-actions">
-      <button class="btn-small" onclick="toggleManual()">✏️ Manual Entry</button>
       <button class="btn-small undo" id="btn-undo" onclick="undoLast()" style="display:none;">↩ Undo Last</button>
-    </div>
-
-    <!-- MANUAL PANEL -->
-    <div class="manual-panel" id="manual-panel">
-      <div class="manual-row">
-        <input class="manual-input" id="manual-upc" type="text"
-          inputmode="numeric" placeholder="Type UPC number…"
-          onkeydown="if(event.key==='Enter') lookupManual()">
-        <button class="manual-go" onclick="lookupManual()">→</button>
-      </div>
     </div>
 
     <!-- PRODUCT LIST -->
@@ -621,17 +589,7 @@ function stopScanner() {
   setStatus('ok', 'Ready');
 }
 
-function lookupManual() {
-  const raw = document.getElementById('manual-upc').value.trim();
-  if (!raw) return;
-  showResult(raw.replace(/[-\s]/g, ''));
-  document.getElementById('manual-upc').value = '';
-  document.getElementById('manual-panel').classList.remove('open');
-}
 
-function toggleManual() {
-  document.getElementById('manual-panel').classList.toggle('open');
-}
 
 // ── FILTERS ──────────────────────────────────────────────────
 function buildFilters() {
