@@ -722,12 +722,8 @@ function renderList() {
   const dept=document.getElementById('f-dept').value;
   const cat=document.getElementById('f-cat').value;
   const sub=document.getElementById('f-sub').value;
-  const seen=new Map();
-  Object.entries(PRODUCTS).forEach(([upc,p])=>{
-    const stripped=upc.replace(/^0+/,'');
-    if (!seen.has(stripped)||(p.cat&&!seen.get(stripped)[1].cat)) seen.set(stripped,[upc,p]);
-  });
-  let entries=[...seen.values()];
+  // Show only real UPC_EAN entries (those with cat/dept filled = 600 products)
+  let entries=Object.entries(PRODUCTS).filter(([upc,p])=>p.cat);
   if (dept) entries=entries.filter(([,p])=>p.dept&&p.dept.trim()===dept);
   if (cat)  entries=entries.filter(([,p])=>p.cat&&p.cat.trim()===cat);
   if (sub)  entries=entries.filter(([,p])=>p.sub&&p.sub.trim()===sub);
