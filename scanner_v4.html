@@ -4,7 +4,78 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>L&B Label Scanner</title>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js">
+// ── TABS ─────────────────────────────────────────────────────
+function switchTab(tab) {
+  if (tab !== 'scanner') stopScanner();
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ── MANUAL ───────────────────────────────────────────────────
+function lookupManual() {
+  const raw = document.getElementById('manual-upc').value.trim();
+  if (!raw) return;
+  const upc = raw.replace(/[-\s]/g, '');
+  document.getElementById('manual-upc').value = '';
+
+  // Show result in manual tab using same result card logic
+  const found = lookup(upc);
+  const resultDiv = document.getElementById('manual-result');
+  if (!found) {
+    resultDiv.innerHTML = `<div class="result-card show miss">
+      <div class="result-label">Entered</div>
+      <div class="result-code">${upc}</div>
+      <div class="do-not-tag-box">
+        <div class="do-not-tag-title">🚫 Do Not Tag</div>
+        <div class="do-not-tag-sub">Not in MDA certification list</div>
+      </div>
+    </div>`;
+    return;
+  }
+  const { upc: matchedUpc, product: p } = found;
+  const isMIM = p.mda === 'Made in Minnesota';
+  const tagClass = isMIM ? 'mim' : 'mgrown';
+  const tagIcon  = isMIM ? '🏭' : '🌱';
+  const tagFull  = isMIM ? 'Made in Minnesota (MIM)' : 'MN Grown (MG)';
+  resultDiv.innerHTML = `<div class="result-card show found">
+    <div class="result-label">Entered</div>
+    <div class="result-code">${upc}</div>
+    <div class="result-brand">${p.brand}</div>
+    <div class="result-desc">${p.desc}</div>
+    <div class="tag-box ${tagClass}">
+      <div class="tag-label">Apply this tag</div>
+      <div class="tag-name">${tagIcon} ${tagFull}</div>
+    </div>
+    <button class="btn-big btn-big-green" onclick="applyTagManual('${matchedUpc}', this)">✓ &nbsp;Apply Tag</button>
+  </div>`;
+}
+
+function applyTagManual(upc, btn) {
+  btn.style.display = 'none';
+  taggedUPCs.add(upc);
+  lastTaggedUPC = upc;
+  updateUndoTab();
+  renderList();
+  fetch(storeUrl, {
+    method: 'POST', mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'tag', tab: document.getElementById('f-dept').value || 'PRODUCE', upc, workerName })
+  }).then(() => {
+    tagCount++; updateCount();
+    showToast('✓ Tagged!', 'ok');
+    const card = btn.closest('.result-card');
+    const nb = document.createElement('button');
+    nb.className = 'btn-big btn-big-green';
+    nb.textContent = '📷  Go to Scanner';
+    nb.onclick = () => switchTab('scanner');
+    card.appendChild(nb);
+  }).catch(() => showToast('Network error', 'err'));
+}
+
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700;900&display=swap');
   :root {
@@ -67,10 +138,75 @@
   }
   .btn-primary:active { background: var(--maroon-dark); }
 
+
+  /* TAB BAR */
+  .tab-bar {
+    background: var(--white); border-bottom: 2px solid var(--border);
+    display: none; position: sticky; top: 52px; z-index: 99;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.06);
+  }
+  .tab-bar-inner { display: flex; max-width: 480px; margin: 0 auto; }
+  .tab-btn {
+    flex: 1; padding: 11px 0; border: none; background: none;
+    font-family: "DM Sans", sans-serif; font-size: 12px; font-weight: 700;
+    color: var(--muted); cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    border-bottom: 3px solid transparent;
+  }
+  .tab-btn.active { color: var(--maroon); border-bottom-color: var(--maroon); }
+  .tab-icon { font-size: 17px; }
+
+  /* MANUAL TAB */
+  .manual-wrap {
+    max-width: 480px; margin: 0 auto; padding: 20px 14px;
+  }
+  .manual-card {
+    background: var(--white); border-radius: 16px; padding: 24px 20px;
+    box-shadow: 0 2px 10px rgba(122,12,46,0.08);
+  }
+  .manual-card-title { font-size: 16px; font-weight: 900; color: var(--maroon); margin-bottom: 6px; }
+  .manual-card-sub { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+  .manual-row { display: flex; gap: 8px; }
+  .manual-input {
+    flex: 1; padding: 14px 15px; border-radius: 12px;
+    border: 2px solid var(--border); background: var(--cream);
+    color: var(--text); font-family: "Space Mono", monospace; font-size: 15px;
+    outline: none; transition: border 0.2s;
+  }
+  .manual-input:focus { border-color: var(--maroon); }
+  .manual-go {
+    padding: 14px 20px; border-radius: 12px; border: none;
+    background: var(--maroon); color: #fff;
+    font-family: "DM Sans", sans-serif; font-weight: 700; font-size: 16px; cursor: pointer;
+  }
+
+  /* UNDO TAB */
+  .undo-wrap {
+    max-width: 480px; margin: 0 auto; padding: 20px 14px;
+  }
+  .undo-card {
+    background: var(--white); border-radius: 16px; padding: 24px 20px;
+    box-shadow: 0 2px 10px rgba(122,12,46,0.08); text-align: center;
+  }
+  .undo-card-title { font-size: 16px; font-weight: 900; color: var(--maroon); margin-bottom: 6px; }
+  .undo-card-sub { font-size: 13px; color: var(--muted); margin-bottom: 20px; }
+  .undo-last-info {
+    background: var(--cream); border-radius: 12px; padding: 14px;
+    margin-bottom: 16px; font-size: 13px; color: var(--text); text-align: left;
+    display: none;
+  }
+  .undo-last-info.show { display: block; }
+  .btn-undo-big {
+    display: block; width: 100%; padding: 16px; border-radius: 12px; border: none;
+    background: var(--orange); color: #fff;
+    font-family: "DM Sans", sans-serif; font-weight: 700; font-size: 16px; cursor: pointer;
+  }
+  .btn-undo-big:disabled { opacity: 0.4; cursor: not-allowed; }
+
   /* FILTER BAR */
   .filter-bar {
     background: var(--white); border-bottom: 2px solid var(--border);
-    padding: 10px 12px; position: sticky; top: 52px; z-index: 90;
+    padding: 10px 12px; position: sticky; top: 98px; z-index: 90;
     box-shadow: 0 2px 6px rgba(0,0,0,0.05);
   }
   .filter-bar-inner { max-width: 480px; margin: 0 auto; }
@@ -183,15 +319,7 @@
   .saving-indicator { text-align: center; padding: 6px; font-size: 12px; color: var(--muted); display: none; }
 
   /* SECONDARY ACTIONS */
-  .secondary-actions { display: flex; gap: 8px; margin-bottom: 10px; }
-  .btn-small {
-    flex: 1; padding: 10px 12px; border-radius: 10px;
-    border: 2px solid var(--border); background: var(--white);
-    color: var(--muted); font-family: "DM Sans", sans-serif;
-    font-weight: 600; font-size: 13px; cursor: pointer; text-align: center;
-  }
-  .btn-small.undo { border-color: var(--orange); color: var(--orange); }
-  .btn-small:active { background: var(--cream); }
+
   /* PRODUCT LIST */
   .list-header {
     font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
@@ -256,6 +384,22 @@
     <div class="header-sub" id="header-sub"></div>
   </div>
   <div class="worker-badge" id="worker-badge" onclick="changeWorker()">👤 —</div>
+</div>
+
+
+<!-- TAB BAR -->
+<div class="tab-bar" id="tab-bar">
+  <div class="tab-bar-inner">
+    <button class="tab-btn active" id="tab-scanner" onclick="switchTab('scanner')">
+      <span class="tab-icon">📷</span><span>Scanner</span>
+    </button>
+    <button class="tab-btn" id="tab-manual" onclick="switchTab('manual')">
+      <span class="tab-icon">✏️</span><span>Manual</span>
+    </button>
+    <button class="tab-btn" id="tab-undo" onclick="switchTab('undo')">
+      <span class="tab-icon">↩</span><span>Undo</span>
+    </button>
+  </div>
 </div>
 
 <!-- PAGE: SETUP -->
@@ -331,11 +475,6 @@
     <div id="result-card" class="result-card"></div>
     <div class="saving-indicator" id="saving-indicator">⏳ Saving to sheet…</div>
 
-    <!-- SECONDARY ACTIONS -->
-    <div class="secondary-actions">
-      <button class="btn-small undo" id="btn-undo" onclick="undoLast()" style="display:none;">↩ Undo Last</button>
-    </div>
-
     <!-- PRODUCT LIST -->
     <div class="list-header">
       <span>Products to Label</span>
@@ -343,6 +482,36 @@
     </div>
     <div id="product-list"></div>
 
+  </div>
+</div>
+
+
+<!-- PAGE: MANUAL -->
+<div class="page" id="page-manual">
+  <div class="manual-wrap">
+    <div class="manual-card">
+      <div class="manual-card-title">Manual UPC Entry</div>
+      <div class="manual-card-sub">Type a UPC number to look up a product</div>
+      <div class="manual-row">
+        <input class="manual-input" id="manual-upc" type="text"
+          inputmode="numeric" placeholder="Type UPC…"
+          onkeydown="if(event.key==='Enter') lookupManual()">
+        <button class="manual-go" onclick="lookupManual()">→</button>
+      </div>
+    </div>
+    <div id="manual-result" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+<!-- PAGE: UNDO -->
+<div class="page" id="page-undo">
+  <div class="undo-wrap">
+    <div class="undo-card">
+      <div class="undo-card-title">Undo Last Tag</div>
+      <div class="undo-card-sub">Removes the most recently applied tag from the sheet</div>
+      <div class="undo-last-info" id="undo-info"></div>
+      <button class="btn-undo-big" id="btn-undo-big" onclick="undoLast()" disabled>↩ &nbsp;Undo Last Tag</button>
+    </div>
   </div>
 </div>
 
@@ -427,12 +596,14 @@ function startSession() {
   tagCount = 0; taggedUPCs = new Set(); lastTaggedUPC = null;
 
   document.getElementById('header').style.display     = 'flex';
+  document.getElementById('tab-bar').style.display     = 'flex';
   document.getElementById('status-bar').style.display = 'flex';
   document.getElementById('header-sub').textContent   = store;
   document.getElementById('worker-badge').textContent = '👤 ' + name;
 
   buildFilters();
   showPage('main');
+  switchTab('scanner');
   setStatus('ok', 'Ready');
   updateCount();
 }
@@ -538,7 +709,7 @@ function undoLast() {
   tagCount = Math.max(0, tagCount - 1);
   updateCount();
   renderList();
-  document.getElementById('btn-undo').style.display = 'none';
+  updateUndoTab();
 
   fetch(storeUrl, {
     method: 'POST', mode: 'no-cors',
@@ -546,6 +717,20 @@ function undoLast() {
     body: JSON.stringify({ action: 'undo', tab: document.getElementById('f-dept').value || 'PRODUCE', upc, workerName: '' })
   }).then(() => showToast('↩ Undone', 'warn'))
     .catch(() => showToast('Network error', 'err'));
+}
+
+function updateUndoTab() {
+  const btn  = document.getElementById('btn-undo-big');
+  const info = document.getElementById('undo-info');
+  if (lastTaggedUPC && PRODUCTS[lastTaggedUPC]) {
+    const p = PRODUCTS[lastTaggedUPC];
+    info.textContent = 'Last tagged: ' + p.desc;
+    info.classList.add('show');
+    btn.disabled = false;
+  } else {
+    info.classList.remove('show');
+    btn.disabled = true;
+  }
 }
 
 // ── SCANNER ──────────────────────────────────────────────────
@@ -695,6 +880,7 @@ function changeWorker() {
   stopScanner();
   document.getElementById('header').style.display     = 'none';
   document.getElementById('status-bar').style.display = 'none';
+  document.getElementById('tab-bar').style.display     = 'none';
   showPage('setup');
 }
 
@@ -720,6 +906,77 @@ function showToast(msg, type) {
   clearTimeout(t._t);
   t._t = setTimeout(() => t.classList.remove('show'), 2800);
 }
+
+// ── TABS ─────────────────────────────────────────────────────
+function switchTab(tab) {
+  if (tab !== 'scanner') stopScanner();
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ── MANUAL ───────────────────────────────────────────────────
+function lookupManual() {
+  const raw = document.getElementById('manual-upc').value.trim();
+  if (!raw) return;
+  const upc = raw.replace(/[-\s]/g, '');
+  document.getElementById('manual-upc').value = '';
+
+  // Show result in manual tab using same result card logic
+  const found = lookup(upc);
+  const resultDiv = document.getElementById('manual-result');
+  if (!found) {
+    resultDiv.innerHTML = `<div class="result-card show miss">
+      <div class="result-label">Entered</div>
+      <div class="result-code">${upc}</div>
+      <div class="do-not-tag-box">
+        <div class="do-not-tag-title">🚫 Do Not Tag</div>
+        <div class="do-not-tag-sub">Not in MDA certification list</div>
+      </div>
+    </div>`;
+    return;
+  }
+  const { upc: matchedUpc, product: p } = found;
+  const isMIM = p.mda === 'Made in Minnesota';
+  const tagClass = isMIM ? 'mim' : 'mgrown';
+  const tagIcon  = isMIM ? '🏭' : '🌱';
+  const tagFull  = isMIM ? 'Made in Minnesota (MIM)' : 'MN Grown (MG)';
+  resultDiv.innerHTML = `<div class="result-card show found">
+    <div class="result-label">Entered</div>
+    <div class="result-code">${upc}</div>
+    <div class="result-brand">${p.brand}</div>
+    <div class="result-desc">${p.desc}</div>
+    <div class="tag-box ${tagClass}">
+      <div class="tag-label">Apply this tag</div>
+      <div class="tag-name">${tagIcon} ${tagFull}</div>
+    </div>
+    <button class="btn-big btn-big-green" onclick="applyTagManual('${matchedUpc}', this)">✓ &nbsp;Apply Tag</button>
+  </div>`;
+}
+
+function applyTagManual(upc, btn) {
+  btn.style.display = 'none';
+  taggedUPCs.add(upc);
+  lastTaggedUPC = upc;
+  updateUndoTab();
+  renderList();
+  fetch(storeUrl, {
+    method: 'POST', mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'tag', tab: document.getElementById('f-dept').value || 'PRODUCE', upc, workerName })
+  }).then(() => {
+    tagCount++; updateCount();
+    showToast('✓ Tagged!', 'ok');
+    const card = btn.closest('.result-card');
+    const nb = document.createElement('button');
+    nb.className = 'btn-big btn-big-green';
+    nb.textContent = '📷  Go to Scanner';
+    nb.onclick = () => switchTab('scanner');
+    card.appendChild(nb);
+  }).catch(() => showToast('Network error', 'err'));
+}
+
 </script>
 </body>
 </html>
