@@ -630,7 +630,6 @@ function showResult(rawCode) {
     <button class="btn btn-outline" id="btn-undo" onclick="undoTag('${upc}')" style="display:none;">
       ↩ Undo Tag
     </button>
-    ${storeRsid ? `<a href="https://www.lundsandbyerlys.com/sm/pickup/rsid/${storeRsid}/product/${upc.padStart(14,'0')}" target="_blank" style="display:block;text-align:center;margin-top:10px;padding:12px;border-radius:12px;border:2px solid var(--border);color:var(--maroon);font-size:13px;font-weight:700;text-decoration:none;">🛒 View on L&B Website</a>` : ''}
   `;
   card.className = 'result-card show found';
   showToast(p.desc.slice(0, 30), 'ok');
