@@ -231,13 +231,25 @@
       <div class="field-label">Store</div>
       <select class="field-input" id="inp-store" onchange="onStoreChange()">
         <option value="">— Select store —</option>
+        <option>St. Louis Park</option>
+        <option>Golden Valley</option>
+        <option>Burnsville</option>
+        <option>Chanhassen</option>
+        <option>Eagan</option>
+        <option>Maple Grove</option>
+        <option>Woodbury</option>
+        <option>Plymouth</option>
+        <option>White Bear Lake</option>
       </select>
     </div>
 
     <div class="field-wrap">
       <div class="field-label">Department</div>
       <select class="field-input" id="inp-dept">
-        <option value="">— Select store first —</option>
+        <option value="">— Select department —</option>
+        <option>PRODUCE</option>
+        <option>BEER</option>
+        <option>DAIRY</option>
       </select>
     </div>
 
@@ -286,7 +298,6 @@ let workerName  = '';
 let storeName   = '';
 let deptTab     = '';
 let storeUrl    = '';
-let storeRsid   = '';
 let tagCount    = 0;
 let lastScanned  = '';
 let lastScanTime = 0;
@@ -294,30 +305,27 @@ let html5QrCode  = null;
 let scannerOn    = false;
 let currentUPC   = null;
 
-// ── On load: populate store dropdown from STORE_CONFIG ───────
-window.addEventListener('load', () => {
-  const sel = document.getElementById('inp-store');
-  Object.keys(STORE_CONFIG).forEach(store => {
-    const opt = document.createElement('option');
-    opt.value = opt.textContent = store;
-    sel.appendChild(opt);
-  });
-});
+// ── Hardcoded store data ──────────────────────────────────────
+const STORE_RSIDS = {
+  "St. Louis Park":  "1007",
+  "Golden Valley":   "1001",
+  "Burnsville":      "1011",
+  "Chanhassen":      "1012",
+  "Eagan":           "1013",
+  "Maple Grove":     "15014",
+  "Woodbury":        "15031",
+  "Plymouth":        "51009",
+  "White Bear Lake": "51019"
+};
 
-// ── When store changes: populate dept dropdown ───────────────
-function onStoreChange() {
-  const store = document.getElementById('inp-store').value;
-  const deptSel = document.getElementById('inp-dept');
-  deptSel.innerHTML = '<option value="">— Select department —</option>';
+const STORE_URLS = {
+  "St. Louis Park": "https://script.google.com/macros/s/AKfycbx7KE7kRTaCJpI8SUzedQtCS9lHQmJcRGrt1HT6VF6MYcBAHF6O6-QtW1PSNdJx0S404g/exec",
+  "Golden Valley":  "https://script.google.com/macros/s/AKfycbw56dmi5F93xRtykSvvpTg7YyYjJY895z8R4dl_YuUQkixObRILmdrY1vaoikwfSDfrEg/exec"
+  // Other stores: add URL here when Google Sheet is set up
+};
 
-  if (!store || !STORE_CONFIG[store]) return;
-
-  STORE_CONFIG[store].tabs.forEach(tab => {
-    const opt = document.createElement('option');
-    opt.value = opt.textContent = tab;
-    deptSel.appendChild(opt);
-  });
-}
+// ── When store changes: no-op (dept is hardcoded) ────────────
+function onStoreChange() {}
 
 // ── Start session ────────────────────────────────────────────
 function startSession() {
@@ -333,8 +341,8 @@ function startSession() {
   workerName = name;
   storeName  = store;
   deptTab    = dept;
-  storeUrl   = STORE_CONFIG[store].url;
-  storeRsid  = STORE_CONFIG[store].rsid || '';
+  storeUrl   = STORE_URLS[store] || '';
+  storeRsid  = STORE_RSIDS[store] || '';
   tagCount   = 0;
 
   document.getElementById('header').style.display     = 'flex';
@@ -422,14 +430,6 @@ function showResult(rawCode) {
     <button class="btn btn-outline" id="btn-undo" onclick="undoTag('${upc}')" style="display:none;">
       ↩ Undo Tag
     </button>
-    ${storeRsid ? `
-    <a href="https://www.lundsandbyerlys.com/sm/pickup/rsid/${storeRsid}/product/${upc.padStart(14,'0')}"
-       target="_blank"
-       style="display:block;text-align:center;margin-top:10px;padding:12px;border-radius:12px;
-              border:2px solid var(--border);color:var(--muted);font-size:13px;font-weight:700;
-              text-decoration:none;">
-      🛒 View on L&amp;B Website
-    </a>` : ''}
   `;
   card.className = 'result-card show found';
   showToast(p.desc.slice(0, 30), 'ok');
