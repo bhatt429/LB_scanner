@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>L&B Label Scanner v2</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="products.js"></script>
+<script src="stores.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700;900&display=swap');
+  :root {
+    --maroon: #7A0C2E; --maroon-dark: #5a0920;
+    --gold: #F0B722; --orange: #E07020;
+    --cream: #F5F0E8; --white: #ffffff;
+    --text: #1a0a10; --muted: #9a7a84;
+    --border: #ddd0d4;
+    --success: #1a7a42; --success-bg: #edfaf3;
+    --error: #c0182e; --error-bg: #fff0f2;
+    --warn: #b86000; --warn-bg: #fff7e6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--cream); color: var(--text); font-family: "DM Sans", sans-serif; min-height: 100vh; }
+
+  .header {
+    background: var(--maroon); padding: 14px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    box-shadow: 0 2px 8px rgba(122,12,46,0.3);
+  }
+  .header-title { color: #fff; font-size: 16px; font-weight: 900; }
+  .header-sub { color: rgba(255,255,255,0.65); font-size: 11px; }
+  .worker-badge {
+    background: var(--gold); color: var(--maroon-dark);
+    font-family: "Space Mono", monospace; font-size: 11px; font-weight: 700;
+    padding: 4px 10px; border-radius: 20px; cursor: pointer;
+  }
+
+  .page { display: none; padding: 20px; max-width: 480px; margin: 0 auto; }
+  .page.active { display: block; }
+
+  .setup-card {
+    background: var(--white); border-radius: 16px;
+    padding: 28px 24px; box-shadow: 0 2px 12px rgba(122,12,46,0.1);
+    margin-top: 24px;
+  }
+  .setup-logo { text-align: center; margin-bottom: 24px; }
+  .setup-logo-text { font-size: 28px; font-weight: 900; color: var(--maroon); }
+  .setup-logo-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+  .field-label {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted); margin-bottom: 6px;
+    font-family: "Space Mono", monospace;
+  }
+  .field-wrap { margin-bottom: 16px; }
+  .field-input {
+    width: 100%; padding: 13px 15px; border-radius: 12px;
+    border: 2px solid var(--border); background: var(--cream);
+    color: var(--text); font-family: "DM Sans", sans-serif; font-size: 15px;
+    outline: none; transition: border 0.2s; appearance: none;
+    -webkit-appearance: none;
+  }
+  .field-input:focus { border-color: var(--maroon); }
+
+  .btn {
+    display: block; width: 100%; padding: 15px; border-radius: 12px;
+    border: none; font-family: "DM Sans", sans-serif;
+    font-weight: 700; font-size: 15px; cursor: pointer;
+    transition: all 0.18s; letter-spacing: 0.01em; margin-bottom: 10px;
+  }
+  .btn-primary { background: var(--maroon); color: #fff; }
+  .btn-primary:active { background: var(--maroon-dark); }
+  .btn-danger  { background: var(--error); color: #fff; }
+  .btn-success { background: var(--success); color: #fff; font-size: 17px; padding: 18px; }
+  .btn-outline { background: transparent; color: var(--maroon); border: 2px solid var(--maroon); }
+
+  .scanner-wrap {
+    position: relative; width: 100%; border-radius: 16px;
+    overflow: hidden; background: #000;
+    margin-bottom: 16px; box-shadow: 0 4px 20px rgba(122,12,46,0.2);
+    display: none;
+  }
+  #qr-reader { border: none !important; padding: 0 !important; width: 100% !important; }
+  #qr-reader video { width: 100% !important; height: 100% !important; object-fit: cover !important; border-radius: 0 !important; }
+  #qr-reader img { display: none !important; }
+  #qr-reader__scan_region { padding: 0 !important; }
+  #qr-reader__dashboard { display: none !important; }
+
+  .scan-overlay {
+    position: absolute; inset: 0; pointer-events: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .scan-frame { width: 75%; height: 30%; position: relative; }
+  .scan-frame::before, .scan-frame::after,
+  .scan-frame span::before, .scan-frame span::after {
+    content: ""; position: absolute; width: 24px; height: 24px;
+    border-color: var(--gold); border-style: solid;
+  }
+  .scan-frame::before { top:0; left:0; border-width: 3px 0 0 3px; border-radius: 3px 0 0 0; }
+  .scan-frame::after  { top:0; right:0; border-width: 3px 3px 0 0; border-radius: 0 3px 0 0; }
+  .scan-frame span::before { bottom:0; left:0; border-width: 0 0 3px 3px; border-radius: 0 0 0 3px; }
+  .scan-frame span::after  { bottom:0; right:0; border-width: 0 3px 3px 0; border-radius: 0 0 3px 0; }
+  .scan-line {
+    position: absolute; left: 4%; right: 4%; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    animation: scanline 2s ease-in-out infinite;
+    box-shadow: 0 0 10px var(--gold);
+  }
+  @keyframes scanline {
+    0%   { top: 4%;  opacity: 0; }
+    10%  { opacity: 1; }
+    90%  { opacity: 1; }
+    100% { top: 96%; opacity: 0; }
+  }
+
+  .result-card {
+    border-radius: 16px; padding: 20px; margin-bottom: 12px;
+    display: none; border: 2px solid transparent;
+    animation: popIn 0.25s cubic-bezier(0.175,0.885,0.32,1.275);
+  }
+  .result-card.show   { display: block; }
+  .result-card.found  { background: var(--success-bg); border-color: #a8e6c3; }
+  .result-card.miss   { background: var(--error-bg);   border-color: #f5b8c0; }
+
+  @keyframes popIn {
+    from { transform: scale(0.93) translateY(6px); opacity: 0; }
+    to   { transform: scale(1)    translateY(0);   opacity: 1; }
+  }
+
+  .result-label { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 3px; font-weight: 700; font-family: "Space Mono", monospace; }
+  .result-code  { font-family: "Space Mono", monospace; font-size: 12px; font-weight: 700; color: var(--maroon); margin-bottom: 10px; word-break: break-all; }
+  .result-brand { font-size: 13px; color: var(--muted); margin-bottom: 2px; font-weight: 500; }
+  .result-desc  { font-size: 19px; font-weight: 900; line-height: 1.2; margin-bottom: 12px; }
+
+  .tag-box { border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; border: 2px solid; }
+  .tag-box.mim    { background: #1a3a6e12; border-color: #1a3a6e40; }
+  .tag-box.mgrown { background: #1a5c2a12; border-color: #1a5c2a40; }
+  .tag-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; font-family: "Space Mono", monospace; }
+  .tag-box.mim    .tag-label { color: #1a3a6e; }
+  .tag-box.mgrown .tag-label { color: #1a5c2a; }
+  .tag-name { font-size: 16px; font-weight: 900; }
+  .tag-box.mim    .tag-name { color: #1a3a6e; }
+  .tag-box.mgrown .tag-name { color: #1a5c2a; }
+
+  .note-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 30px;
+    font-size: 12px; font-weight: 700; margin-bottom: 14px;
+  }
+  .note-pill.flagged     { background: var(--success); color: #fff; }
+  .note-pill.not-flagged { background: var(--orange);  color: #fff; }
+  .note-pill.na          { background: #ccc; color: #555; }
+
+  .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin: 14px 0; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+  .manual-row { display: flex; gap: 10px; }
+  .manual-input {
+    flex: 1; padding: 13px 15px; border-radius: 12px;
+    border: 2px solid var(--border); background: #fff;
+    color: var(--text); font-family: "Space Mono", monospace; font-size: 14px;
+    outline: none; transition: border 0.2s;
+  }
+  .manual-input:focus { border-color: var(--maroon); }
+  .manual-go {
+    padding: 13px 20px; border-radius: 12px; border: none;
+    background: var(--maroon); color: #fff;
+    font-family: "DM Sans", sans-serif; font-weight: 700; font-size: 15px; cursor: pointer;
+  }
+
+  .toast {
+    position: fixed; bottom: 28px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--maroon); color: #fff;
+    padding: 11px 22px; border-radius: 30px;
+    font-weight: 700; font-size: 13px; z-index: 999;
+    transition: transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275);
+    white-space: nowrap; box-shadow: 0 4px 16px rgba(122,12,46,0.4);
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.ok   { background: var(--success); }
+  .toast.warn { background: var(--orange); }
+  .toast.err  { background: var(--error); }
+
+  .status-bar {
+    background: var(--white); border-top: 1px solid var(--border);
+    padding: 8px 20px; display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--muted);
+    font-family: "Space Mono", monospace;
+    position: sticky; bottom: 0;
+  }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #ccc; margin-right: 5px; vertical-align: middle; }
+  .dot.on  { background: var(--gold); animation: pulse 1.5s infinite; }
+  .dot.ok  { background: var(--success); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .saving-indicator {
+    text-align: center; padding: 8px;
+    font-size: 12px; color: var(--muted); display: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header" id="header" style="display:none;">
+  <div>
+    <div class="header-title">L&amp;B Label Scanner</div>
+    <div class="header-sub" id="header-sub">—</div>
+  </div>
+  <div class="worker-badge" id="worker-badge" onclick="changeWorker()">👤 —</div>
+</div>
+
+<!-- PAGE: SETUP -->
+<div class="page active" id="page-setup">
+  <div class="setup-card">
+    <div class="setup-logo">
+      <div class="setup-logo-text">L&amp;B Scanner</div>
+      <div class="setup-logo-sub">MDA Label Compliance Tool</div>
+    </div>
+
+    <div class="field-wrap">
+      <div class="field-label">Your Name</div>
+      <input class="field-input" id="inp-name" type="text"
+        placeholder="e.g. Sarah" autocomplete="off">
+    </div>
+
+    <div class="field-wrap">
+      <div class="field-label">Store</div>
+      <select class="field-input" id="inp-store" onchange="onStoreChange()">
+        <option value="">— Select store —</option>
+      </select>
+    </div>
+
+    <div class="field-wrap">
+      <div class="field-label">Department</div>
+      <select class="field-input" id="inp-dept">
+        <option value="">— Select store first —</option>
+      </select>
+    </div>
+
+    <button class="btn btn-primary" onclick="startSession()">Start Scanning →</button>
+    <div id="setup-err" style="text-align:center;font-size:12px;color:var(--error);margin-top:8px;min-height:18px;"></div>
+  </div>
+</div>
+
+<!-- PAGE: SCANNER -->
+<div class="page" id="page-scanner">
+
+  <div class="scanner-wrap" id="scanner-wrap">
+    <div id="qr-reader"></div>
+    <div class="scan-overlay">
+      <div class="scan-frame"><span></span><div class="scan-line"></div></div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="btn-start" onclick="startScanner()">▶ &nbsp;Start Camera</button>
+  <button class="btn btn-danger"  id="btn-stop"  onclick="stopScanner()" style="display:none;">■ &nbsp;Stop Camera</button>
+
+  <div id="result-card" class="result-card"></div>
+  <div class="saving-indicator" id="saving-indicator">⏳ Saving to sheet…</div>
+
+  <div class="divider">or enter manually</div>
+  <div class="manual-row">
+    <input class="manual-input" id="manual-upc" type="text"
+      inputmode="numeric" placeholder="Type UPC or PLU…"
+      onkeydown="if(event.key==='Enter') lookupManual()">
+    <button class="manual-go" onclick="lookupManual()">→</button>
+  </div>
+
+</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar" id="status-bar" style="display:none;">
+  <span><span class="dot" id="dot"></span><span id="status-txt">Ready</span></span>
+  <span id="count-txt">0 tagged</span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────
+let workerName  = '';
+let storeName   = '';
+let deptTab     = '';
+let storeUrl    = '';
+let storeRsid   = '';
+let tagCount    = 0;
+let lastScanned  = '';
+let lastScanTime = 0;
+let html5QrCode  = null;
+let scannerOn    = false;
+let currentUPC   = null;
+
+// ── On load: populate store dropdown from STORE_CONFIG ───────
+window.addEventListener('load', () => {
+  const sel = document.getElementById('inp-store');
+  Object.keys(STORE_CONFIG).forEach(store => {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = store;
+    sel.appendChild(opt);
+  });
+});
+
+// ── When store changes: populate dept dropdown ───────────────
+function onStoreChange() {
+  const store = document.getElementById('inp-store').value;
+  const deptSel = document.getElementById('inp-dept');
+  deptSel.innerHTML = '<option value="">— Select department —</option>';
+
+  if (!store || !STORE_CONFIG[store]) return;
+
+  STORE_CONFIG[store].tabs.forEach(tab => {
+    const opt = document.createElement('option');
+    opt.value = opt.textContent = tab;
+    deptSel.appendChild(opt);
+  });
+}
+
+// ── Start session ────────────────────────────────────────────
+function startSession() {
+  const name  = document.getElementById('inp-name').value.trim();
+  const store = document.getElementById('inp-store').value;
+  const dept  = document.getElementById('inp-dept').value;
+  const err   = document.getElementById('setup-err');
+
+  if (!name)  { err.textContent = 'Please enter your name.';     return; }
+  if (!store) { err.textContent = 'Please select a store.';      return; }
+  if (!dept)  { err.textContent = 'Please select a department.'; return; }
+
+  workerName = name;
+  storeName  = store;
+  deptTab    = dept;
+  storeUrl   = STORE_CONFIG[store].url;
+  storeRsid  = STORE_CONFIG[store].rsid || '';
+  tagCount   = 0;
+
+  document.getElementById('header').style.display     = 'flex';
+  document.getElementById('status-bar').style.display = 'flex';
+  document.getElementById('header-sub').textContent   = store + ' · ' + dept;
+  document.getElementById('worker-badge').textContent = '👤 ' + name;
+
+  showPage('scanner');
+  setStatus('ok', 'Ready — tap Start Camera');
+  updateCount();
+}
+
+// ── Lookup: try multiple UPC variants ────────────────────────
+function lookup(raw) {
+  const c = String(raw).replace(/[-\s]/g, '');
+  const stripped = c.replace(/^0+/, '') || c;
+
+  const variants = [
+    c,
+    stripped,
+    c.padStart(13, '0'),
+    c.padStart(12, '0'),
+    stripped.slice(0, -1),
+    c.slice(0, -1),
+    stripped.slice(0, -2),
+    c.slice(0, -2),
+  ];
+
+  for (const v of variants) {
+    if (!v) continue;
+    if (PRODUCTS[v]) return { upc: v, product: PRODUCTS[v] };
+    const vs = v.replace(/^0+/, '');
+    for (const [key, prod] of Object.entries(PRODUCTS)) {
+      if (key.replace(/^0+/, '') === vs) return { upc: key, product: prod };
+    }
+  }
+  return null;
+}
+
+// ── Show result ──────────────────────────────────────────────
+function showResult(rawCode) {
+  currentUPC = rawCode;
+  const card  = document.getElementById('result-card');
+  const found = lookup(rawCode);
+
+  if (!found) {
+    card.innerHTML = `
+      <div class="result-label">Scanned</div>
+      <div class="result-code">${rawCode}</div>
+      <div style="font-size:16px;font-weight:700;color:var(--error);margin-bottom:6px;">❌ No match found</div>
+      <div style="font-size:13px;color:var(--muted);">This product is not in the ${deptTab} list.</div>
+    `;
+    card.className = 'result-card show miss';
+    showToast('No match', 'err');
+    return;
+  }
+
+  const { upc, product: p } = found;
+  const isMIM    = p.mda === 'Made in Minnesota';
+  const tagClass = isMIM ? 'mim' : 'mgrown';
+  const tagIcon  = isMIM ? '🏭' : '🌱';
+  const tagFull  = isMIM ? 'Made in Minnesota (MIM)' : 'MN Grown (MG)';
+
+  let notePill = '';
+  if (p.note === 'Flagged as Local')
+    notePill = `<span class="note-pill flagged">✓ Flagged as Local</span>`;
+  else if (p.note === 'Not flagged as local')
+    notePill = `<span class="note-pill not-flagged">🟠 Not Flagged as Local</span>`;
+  else if (p.note)
+    notePill = `<span class="note-pill na">${p.note}</span>`;
+
+  card.innerHTML = `
+    <div class="result-label">Scanned</div>
+    <div class="result-code">${rawCode}</div>
+    <div class="result-brand">${p.brand}</div>
+    <div class="result-desc">${p.desc}</div>
+    <div class="tag-box ${tagClass}">
+      <div class="tag-label">Apply this tag</div>
+      <div class="tag-name">${tagIcon} ${tagFull}</div>
+    </div>
+    ${notePill ? notePill + '<br><br>' : ''}
+    <button class="btn btn-success" id="btn-done" onclick="confirmDone('${upc}')">
+      ✓ &nbsp;Done — Tag Applied
+    </button>
+    <button class="btn btn-outline" id="btn-undo" onclick="undoTag('${upc}')" style="display:none;">
+      ↩ Undo Tag
+    </button>
+    ${storeRsid ? `
+    <a href="https://www.lundsandbyerlys.com/sm/pickup/rsid/${storeRsid}/product/${upc.padStart(14,'0')}"
+       target="_blank"
+       style="display:block;text-align:center;margin-top:10px;padding:12px;border-radius:12px;
+              border:2px solid var(--border);color:var(--muted);font-size:13px;font-weight:700;
+              text-decoration:none;">
+      🛒 View on L&amp;B Website
+    </a>` : ''}
+  `;
+  card.className = 'result-card show found';
+  showToast(p.desc.slice(0, 30), 'ok');
+}
+
+// ── Done ─────────────────────────────────────────────────────
+function confirmDone(upc) {
+  const btnDone = document.getElementById('btn-done');
+  const btnUndo = document.getElementById('btn-undo');
+  if (btnDone) btnDone.style.display = 'none';
+  setSaving(true);
+
+  fetch(storeUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'tag', tab: deptTab, upc: upc, workerName: workerName })
+  }).then(() => {
+    setSaving(false);
+    tagCount++;
+    updateCount();
+    if (btnUndo) btnUndo.style.display = 'block';
+    const card = document.getElementById('result-card');
+    const info = document.createElement('div');
+    info.style.cssText = 'font-size:13px;color:var(--success);font-weight:700;margin-bottom:10px;';
+    info.textContent = '✓ Tagged by ' + workerName;
+    if (btnUndo) card.insertBefore(info, btnUndo);
+    showToast('✓ Saved to sheet!', 'ok');
+  }).catch(() => {
+    setSaving(false);
+    if (btnDone) btnDone.style.display = 'block';
+    showToast('Network error — try again', 'err');
+  });
+}
+
+// ── Undo ─────────────────────────────────────────────────────
+function undoTag(upc) {
+  const btnUndo = document.getElementById('btn-undo');
+  if (btnUndo) btnUndo.disabled = true;
+  setSaving(true);
+
+  fetch(storeUrl, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'undo', tab: deptTab, upc: upc, workerName: '' })
+  }).then(() => {
+    setSaving(false);
+    tagCount = Math.max(0, tagCount - 1);
+    updateCount();
+    showResult(currentUPC);
+    showToast('↩ Tag undone', 'warn');
+  }).catch(() => {
+    setSaving(false);
+    if (btnUndo) btnUndo.disabled = false;
+    showToast('Network error — try again', 'err');
+  });
+}
+
+// ── Scanner ──────────────────────────────────────────────────
+function startScanner() {
+  if (typeof Html5Qrcode === 'undefined') {
+    showToast('Scanner library not loaded', 'err'); return;
+  }
+  document.getElementById('scanner-wrap').style.display = 'block';
+  document.getElementById('btn-start').style.display = 'none';
+  document.getElementById('btn-stop').style.display  = 'block';
+  setStatus('on', 'Scanning…');
+
+  html5QrCode = new Html5Qrcode('qr-reader');
+  html5QrCode.start(
+    { facingMode: 'environment' },
+    {
+      fps: 15,
+      qrbox: { width: 280, height: 120 },
+      formatsToSupport: [
+        Html5QrcodeSupportedFormats.EAN_13,
+        Html5QrcodeSupportedFormats.EAN_8,
+        Html5QrcodeSupportedFormats.UPC_A,
+        Html5QrcodeSupportedFormats.UPC_E,
+        Html5QrcodeSupportedFormats.CODE_128,
+        Html5QrcodeSupportedFormats.CODE_39,
+        Html5QrcodeSupportedFormats.ITF
+      ]
+    },
+    (decodedText) => {
+      const now = Date.now();
+      if (decodedText === lastScanned && now - lastScanTime < 4000) return;
+      lastScanned  = decodedText;
+      lastScanTime = now;
+      showResult(decodedText);
+    },
+    () => {}
+  ).catch(err => {
+    showToast('Camera error: ' + err, 'err');
+    stopScanner();
+  });
+  scannerOn = true;
+}
+
+function stopScanner() {
+  if (html5QrCode && scannerOn) {
+    html5QrCode.stop()
+      .then(() => { html5QrCode.clear(); html5QrCode = null; })
+      .catch(() => {});
+    scannerOn = false;
+  }
+  document.getElementById('scanner-wrap').style.display = 'none';
+  document.getElementById('btn-start').style.display = 'block';
+  document.getElementById('btn-stop').style.display  = 'none';
+  setStatus('ok', 'Ready');
+}
+
+function lookupManual() {
+  const raw = document.getElementById('manual-upc').value.trim();
+  if (!raw) return;
+  showResult(raw.replace(/[-\s]/g, ''));
+  document.getElementById('manual-upc').value = '';
+}
+
+// ── Helpers ──────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+}
+
+function changeWorker() {
+  stopScanner();
+  showPage('setup');
+  document.getElementById('header').style.display     = 'none';
+  document.getElementById('status-bar').style.display = 'none';
+}
+
+function setStatus(state, txt) {
+  document.getElementById('status-txt').textContent = txt;
+  const d = document.getElementById('dot');
+  d.className = 'dot' + (state ? ' ' + state : '');
+}
+
+function updateCount() {
+  document.getElementById('count-txt').textContent = tagCount + ' tagged';
+}
+
+function setSaving(on) {
+  document.getElementById('saving-indicator').style.display = on ? 'block' : 'none';
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
