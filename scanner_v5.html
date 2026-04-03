@@ -558,7 +558,6 @@ function showResult(rawCode) {
   const tagIcon  = isMIM?'&#127981;':'&#127807;';
   const tagFull  = isMIM?'Made in Minnesota (MIM)':'MN Grown (MG)';
 
-  // Already tagged — show different card
   if (taggedUPCs.has(upc)) {
     card.innerHTML = `
       <div class="result-label">Scanned</div>
@@ -786,41 +785,19 @@ function renderList() {
   if (sub)  entries=entries.filter(([,p])=>p.sub&&p.sub.trim()===sub);
   entries=entries.filter(([upc])=>!taggedUPCs.has(upc));
   entries.sort((a,b)=>a[1].desc.localeCompare(b[1].desc));
-  // Build counter — dept / cat / sub level
   const allWithCat = Object.entries(PRODUCTS).filter(([,p])=>p.cat);
-
-  // Dept level
-  const deptAll      = dept ? allWithCat.filter(([,p])=>p.dept&&p.dept.trim()===dept) : allWithCat;
-  const deptTagged   = deptAll.filter(([upc])=>taggedUPCs.has(upc)).length;
-  const deptRemain   = deptAll.length - deptTagged;
-
-  // Cat level
-  const catAll     = cat ? deptAll.filter(([,p])=>p.cat&&p.cat.trim()===cat) : deptAll;
+  const deptAll    = dept ? allWithCat.filter(([,p])=>p.dept&&p.dept.trim()===dept) : allWithCat;
+  const catAll     = cat  ? deptAll.filter(([,p])=>p.cat&&p.cat.trim()===cat)       : deptAll;
+  const subAll     = sub  ? catAll.filter(([,p])=>p.sub&&p.sub.trim()===sub)         : catAll;
   const catTagged  = catAll.filter(([upc])=>taggedUPCs.has(upc)).length;
   const catRemain  = catAll.length - catTagged;
-
-  // Sub level
-  const subAll     = sub ? catAll.filter(([,p])=>p.sub&&p.sub.trim()===sub) : catAll;
   const subTagged  = subAll.filter(([upc])=>taggedUPCs.has(upc)).length;
   const subRemain  = subAll.length - subTagged;
-
-  const deptLabel = dept || 'All Departments';
-  const catLabel  = cat  || 'All Categories';
-  const subLabel  = sub  || 'All Subcategories';
-
-  document.getElementById('filter-counter').innerHTML =
-    \`<div class="filter-counter-row">
-       <span class="filter-counter-label">\${deptLabel}</span>
-       <span class="filter-counter-nums"><span class="rem">\${deptRemain} remaining</span> &nbsp; <span class="tag">\${deptTagged} tagged</span></span>
-     </div>
-     <div class="filter-counter-row">
-       <span class="filter-counter-label">\${catLabel}</span>
-       <span class="filter-counter-nums"><span class="rem">\${catRemain} remaining</span> &nbsp; <span class="tag">\${catTagged} tagged</span></span>
-     </div>
-     <div class="filter-counter-row">
-       <span class="filter-counter-label">\${subLabel}</span>
-       <span class="filter-counter-nums"><span class="rem">\${subRemain} remaining</span> &nbsp; <span class="tag">\${subTagged} tagged</span></span>
-     </div>\`;
+  let counterHTML = '';
+  if (cat) counterHTML += `<div class="filter-counter-row"><span class="filter-counter-label">CATEGORY: ${cat}</span><span class="filter-counter-nums"><span class="rem">${catRemain}</span> remaining &nbsp; <span class="tag">${catTagged}</span> tagged</span></div>`;
+  if (sub) counterHTML += `<div class="filter-counter-row"><span class="filter-counter-label">SUBCATEGORY: ${sub}</span><span class="filter-counter-nums"><span class="rem">${subRemain}</span> remaining &nbsp; <span class="tag">${subTagged}</span> tagged</span></div>`;
+  if (!cat && !sub) counterHTML = `<div class="filter-counter-row"><span class="filter-counter-nums"><span class="rem">${entries.length}</span> remaining &nbsp; <span class="tag">${tagCount}</span> tagged</span></div>`;
+  document.getElementById('filter-counter').innerHTML = counterHTML;
   document.getElementById('list-count').textContent=entries.length+' products';
   const list=document.getElementById('product-list');
   if (!entries.length) { list.innerHTML='<div class="empty-state">&#127881; All done in this section!</div>'; return; }
@@ -901,11 +878,12 @@ window.addEventListener('load', function() {
     document.getElementById('status-bar').style.display='flex';
     document.getElementById('header-sub').textContent=storeName;
     document.getElementById('worker-badge').textContent='\u{1F464} '+workerName;
+    // Pre-fill setup form in case they want to see it
     document.getElementById('inp-name').value=workerName;
     document.getElementById('inp-store').value=storeName;
     buildFilters();
     switchTab('scanner');
-    setStatus('ok','Session restored \u2013 '+tagCount+' tagged');
+    setStatus('ok','Session restored – '+tagCount+' tagged');
     updateCount();
     updateUndoTab();
     showToast('Session restored! '+tagCount+' tagged', 'ok');
