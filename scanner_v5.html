@@ -4,27 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>L&B Label Scanner</title>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js">
-// ── RESTORE SESSION ON PAGE LOAD ────────────────────────────
-window.addEventListener('load', function() {
-  if (loadProgress() && storeName && workerName) {
-    document.getElementById('header').style.display='flex';
-    document.getElementById('tab-bar').style.display='flex';
-    document.getElementById('status-bar').style.display='flex';
-    document.getElementById('header-sub').textContent=storeName;
-    document.getElementById('worker-badge').textContent='\u{1F464} '+workerName;
-    // Pre-fill setup form in case they want to see it
-    document.getElementById('inp-name').value=workerName;
-    document.getElementById('inp-store').value=storeName;
-    buildFilters();
-    switchTab('scanner');
-    setStatus('ok','Session restored – '+tagCount+' tagged');
-    updateCount();
-    updateUndoTab();
-    showToast('Session restored! '+tagCount+' tagged', 'ok');
-  }
-});
-</script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700;900&display=swap');
   :root {
@@ -912,6 +892,23 @@ window.addEventListener('load', function() {
     showToast('Session restored! '+tagCount+' tagged', 'ok');
   }
 });
+
+// ── RESTORE SESSION ON PAGE LOAD ────────────────────────────
+window.addEventListener('load', function() {
+  if (loadProgress() && storeName && workerName) {
+    document.getElementById('header').style.display='flex';
+    document.getElementById('tab-bar').style.display='flex';
+    document.getElementById('status-bar').style.display='flex';
+    document.getElementById('header-sub').textContent=storeName;
+    document.getElementById('worker-badge').textContent='\u{1F464} '+workerName;
+    document.getElementById('inp-name').value=workerName;
+    document.getElementById('inp-store').value=storeName;
+    buildFilters();
+    switchTab('scanner');
+    setStatus('ok','Session restored \u2013 '+tagCount+' tagged');
+    updateCount();
+    updateUndoTab();
+    showToast('Session restored! '+tagCount+' tagged', 'ok');
+  }
+});
 </script>
-</body>
-</html>
