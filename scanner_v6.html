@@ -591,22 +591,6 @@ function showResult(rawCode) {
   const tagIcon  = isMIM?'&#127981;':'&#127807;';
   const tagFull  = isMIM?'Made in Minnesota (MIM)':'MN Grown (MG)';
 
-  // Already tagged — show product info only, no button, auto-restart camera
-  if (taggedUPCs.has(upc)) {
-    card.innerHTML = `
-      <div class="result-label">Scanned</div>
-      <div class="result-code">${rawCode}</div>
-      <div class="result-brand">${p.brand}</div>
-      <div class="result-desc">${p.desc}</div>`;
-    card.className='result-card show found';
-    setTimeout(() => {
-      card.className='result-card'; card.innerHTML='';
-      currentUPC=null; lastScanned='';
-      if (!scannerOn) startScanner();
-    }, 1500);
-    return;
-  }
-
   card.innerHTML = `
     <div class="result-label">Scanned</div>
     <div class="result-code">${rawCode}</div>
@@ -626,6 +610,7 @@ function applyTag(upc) {
   const btnApply = document.getElementById('btn-apply');
   if (btnApply) btnApply.style.display='none';
   setSaving(true);
+  const alreadyTagged = taggedUPCs.has(upc);
   taggedUPCs.add(upc); lastTaggedUPC=upc;
   renderList(); updateUndoTab();
   fetch(storeUrl, {
@@ -633,7 +618,7 @@ function applyTag(upc) {
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'tag', tab:document.getElementById('f-dept').value||'PRODUCE', upc, workerName})
   }).then(() => {
-    setSaving(false); tagCount++; updateCount(); saveProgress();
+    setSaving(false); if (!alreadyTagged) { tagCount++; } updateCount(); saveProgress();
     showToast('&#10003; Tagged!','ok');
     // Auto-restart: clear card and resume camera immediately
     const card = document.getElementById('result-card');
