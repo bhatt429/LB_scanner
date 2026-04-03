@@ -4,7 +4,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>L&B Label Scanner</title>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js">
+// ── RESTORE SESSION ON PAGE LOAD ────────────────────────────
+window.addEventListener('load', function() {
+  if (loadProgress() && storeName && workerName) {
+    document.getElementById('header').style.display='flex';
+    document.getElementById('tab-bar').style.display='flex';
+    document.getElementById('status-bar').style.display='flex';
+    document.getElementById('header-sub').textContent=storeName;
+    document.getElementById('worker-badge').textContent='\u{1F464} '+workerName;
+    // Pre-fill setup form in case they want to see it
+    document.getElementById('inp-name').value=workerName;
+    document.getElementById('inp-store').value=storeName;
+    buildFilters();
+    switchTab('scanner');
+    setStatus('ok','Session restored – '+tagCount+' tagged');
+    updateCount();
+    updateUndoTab();
+    showToast('Session restored! '+tagCount+' tagged', 'ok');
+  }
+});
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700;900&display=swap');
   :root {
@@ -463,6 +483,39 @@ let tagCount=0, taggedUPCs=new Set(), lastTaggedUPC=null;
 let lastScanned='', lastScanTime=0;
 let html5QrCode=null, scannerOn=false, currentUPC=null;
 
+// ── LOCAL STORAGE ─────────────────────────────────────────────
+function saveProgress() {
+  try {
+    localStorage.setItem('lb_workerName',   workerName);
+    localStorage.setItem('lb_storeName',    storeName);
+    localStorage.setItem('lb_tagCount',     tagCount);
+    localStorage.setItem('lb_taggedUPCs',   JSON.stringify([...taggedUPCs]));
+    localStorage.setItem('lb_lastTaggedUPC',lastTaggedUPC || '');
+  } catch(e) { console.warn('localStorage save failed', e); }
+}
+
+function loadProgress() {
+  try {
+    const saved = localStorage.getItem('lb_storeName');
+    if (!saved) return false;
+    storeName    = saved;
+    workerName   = localStorage.getItem('lb_workerName') || '';
+    tagCount     = parseInt(localStorage.getItem('lb_tagCount') || '0');
+    taggedUPCs   = new Set(JSON.parse(localStorage.getItem('lb_taggedUPCs') || '[]'));
+    lastTaggedUPC = localStorage.getItem('lb_lastTaggedUPC') || null;
+    storeUrl     = STORE_URLS[storeName]  || '';
+    storeRsid    = STORE_RSIDS[storeName] || '';
+    return true;
+  } catch(e) { return false; }
+}
+
+function clearProgress() {
+  try {
+    ['lb_workerName','lb_storeName','lb_tagCount','lb_taggedUPCs','lb_lastTaggedUPC']
+      .forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
+}
+
 // ── SESSION ──────────────────────────────────────────────────
 function startSession() {
   const name  = document.getElementById('inp-name').value.trim();
@@ -473,6 +526,7 @@ function startSession() {
   workerName=name; storeName=store;
   storeUrl=STORE_URLS[store]||''; storeRsid=STORE_RSIDS[store]||'';
   tagCount=0; taggedUPCs=new Set(); lastTaggedUPC=null;
+  clearProgress();
   document.getElementById('header').style.display='flex';
   document.getElementById('tab-bar').style.display='flex';
   document.getElementById('status-bar').style.display='flex';
@@ -543,7 +597,7 @@ function applyTag(upc) {
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'tag', tab:document.getElementById('f-dept').value||'PRODUCE', upc, workerName})
   }).then(() => {
-    setSaving(false); tagCount++; updateCount();
+    setSaving(false); tagCount++; updateCount(); saveProgress();
     showToast('&#10003; Tagged!','ok');
     const card = document.getElementById('result-card');
     const nb = document.createElement('button');
@@ -608,7 +662,7 @@ function applyTagManual(upc) {
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'tag', tab:document.getElementById('f-dept').value||'PRODUCE', upc, workerName})
   }).then(() => {
-    tagCount++; updateCount(); showToast('&#10003; Tagged!','ok');
+    tagCount++; updateCount(); saveProgress(); showToast('&#10003; Tagged!','ok');
     const resultDiv = document.getElementById('manual-result');
     const nb = document.createElement('button');
     nb.className='btn-big btn-big-green'; nb.style.marginTop='10px';
@@ -625,7 +679,7 @@ function undoLast() {
   lastTaggedUPC=null;
   taggedUPCs.delete(upc);
   tagCount=Math.max(0,tagCount-1);
-  updateCount(); renderList(); updateUndoTab();
+  updateCount(); renderList(); updateUndoTab(); saveProgress();
   fetch(storeUrl, {
     method:'POST', mode:'no-cors',
     headers:{'Content-Type':'application/json'},
@@ -781,6 +835,26 @@ function showToast(msg,type) {
   t.innerHTML=msg; t.className='toast show'+(type?' '+type:'');
   clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800);
 }
+
+// ── RESTORE SESSION ON PAGE LOAD ────────────────────────────
+window.addEventListener('load', function() {
+  if (loadProgress() && storeName && workerName) {
+    document.getElementById('header').style.display='flex';
+    document.getElementById('tab-bar').style.display='flex';
+    document.getElementById('status-bar').style.display='flex';
+    document.getElementById('header-sub').textContent=storeName;
+    document.getElementById('worker-badge').textContent='\u{1F464} '+workerName;
+    // Pre-fill setup form in case they want to see it
+    document.getElementById('inp-name').value=workerName;
+    document.getElementById('inp-store').value=storeName;
+    buildFilters();
+    switchTab('scanner');
+    setStatus('ok','Session restored – '+tagCount+' tagged');
+    updateCount();
+    updateUndoTab();
+    showToast('Session restored! '+tagCount+' tagged', 'ok');
+  }
+});
 </script>
 </body>
 </html>
