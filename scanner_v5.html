@@ -19,6 +19,25 @@
   body { background:var(--cream); color:var(--text); font-family:"DM Sans",sans-serif; min-height:100vh; overflow-x:hidden; width:100%; }
   html { overflow-x:hidden; }
 
+
+  /* RESTORE BANNER */
+  .restore-banner {
+    display:none; position:fixed; inset:0; z-index:999;
+    background:rgba(0,0,0,0.55); align-items:center; justify-content:center;
+  }
+  .restore-banner.show { display:flex; }
+  .restore-card {
+    background:var(--white); border-radius:18px; padding:28px 22px;
+    max-width:340px; width:90%; text-align:center;
+    box-shadow:0 8px 32px rgba(0,0,0,0.25);
+  }
+  .restore-icon  { font-size:36px; margin-bottom:10px; }
+  .restore-title { font-size:17px; font-weight:900; color:var(--maroon); margin-bottom:6px; }
+  .restore-sub   { font-size:13px; color:var(--muted); margin-bottom:20px; line-height:1.5; }
+  .restore-btns  { display:flex; flex-direction:column; gap:10px; }
+  .btn-restore-continue { background:var(--success); color:#fff; padding:14px; border-radius:12px; border:none; font-family:"DM Sans",sans-serif; font-weight:700; font-size:15px; cursor:pointer; }
+  .btn-restore-new      { background:var(--cream); color:var(--maroon); padding:14px; border-radius:12px; border:2px solid var(--border); font-family:"DM Sans",sans-serif; font-weight:700; font-size:15px; cursor:pointer; }
+
   /* HEADER */
   .header {
     background:var(--maroon); padding:12px 16px;
@@ -405,6 +424,20 @@
       <div class="tab-card-sub">Removes the most recently applied tag from the sheet</div>
       <div class="undo-last-info" id="undo-info"></div>
       <button class="btn-undo-big" id="btn-undo-big" onclick="undoLast()" disabled>&#8617; &nbsp;Undo Last Tag</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- RESTORE SESSION BANNER -->
+<div class="restore-banner" id="restore-banner">
+  <div class="restore-card">
+    <div class="restore-icon">👋</div>
+    <div class="restore-title" id="restore-title">Welcome back!</div>
+    <div class="restore-sub" id="restore-sub"></div>
+    <div class="restore-btns">
+      <button class="btn-restore-continue" onclick="continueSession()">✓ &nbsp;Continue Session</button>
+      <button class="btn-restore-new"      onclick="newSession()">↩ &nbsp;Start New Session</button>
     </div>
   </div>
 </div>
@@ -850,43 +883,51 @@ function showToast(msg,type) {
   clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800);
 }
 
-// ── RESTORE SESSION ON PAGE LOAD ────────────────────────────
+
+
+// ── RESTORE SESSION ──────────────────────────────────────────
+function continueSession() {
+  document.getElementById('restore-banner').classList.remove('show');
+  document.getElementById('header').style.display='flex';
+  document.getElementById('tab-bar').style.display='flex';
+  document.getElementById('status-bar').style.display='flex';
+  document.getElementById('header-sub').textContent=storeName;
+  document.getElementById('worker-badge').textContent='\u{1F464} '+workerName;
+  document.getElementById('inp-name').value=workerName;
+  document.getElementById('inp-store').value=storeName;
+  buildFilters();
+  switchTab('scanner');
+  setStatus('ok','Session restored \u2013 '+tagCount+' tagged');
+  updateCount();
+  updateUndoTab();
+}
+
+function newSession() {
+  // Keep taggedUPCs and storeName so already-tagged products stay gone from list
+  // Only reset worker identity and counter
+  const savedUPCs  = new Set(taggedUPCs);  // preserve tagged set
+  const savedStore = storeName;             // preserve store
+  clearProgress();
+  // Restore only the tagged UPCs and store back into localStorage
+  workerName=''; tagCount=0; lastTaggedUPC=null;
+  storeName=savedStore; storeUrl=STORE_URLS[savedStore]||''; storeRsid=STORE_RSIDS[savedStore]||'';
+  taggedUPCs=savedUPCs;
+  // Save the preserved UPCs back so they survive page reload too
+  try {
+    localStorage.setItem('lb_taggedUPCs', JSON.stringify([...taggedUPCs]));
+    localStorage.setItem('lb_storeName',  storeName);
+  } catch(e) {}
+  document.getElementById('restore-banner').classList.remove('show');
+  showPage('setup');
+}
+
 window.addEventListener('load', function() {
   if (loadProgress() && storeName && workerName) {
-    document.getElementById('header').style.display='flex';
-    document.getElementById('tab-bar').style.display='flex';
-    document.getElementById('status-bar').style.display='flex';
-    document.getElementById('header-sub').textContent=storeName;
-    document.getElementById('worker-badge').textContent='\u{1F464} '+workerName;
-    // Pre-fill setup form in case they want to see it
-    document.getElementById('inp-name').value=workerName;
-    document.getElementById('inp-store').value=storeName;
-    buildFilters();
-    switchTab('scanner');
-    setStatus('ok','Session restored – '+tagCount+' tagged');
-    updateCount();
-    updateUndoTab();
-    showToast('Session restored! '+tagCount+' tagged', 'ok');
+    document.getElementById('restore-title').textContent = 'Welcome back, ' + workerName + '!';
+    document.getElementById('restore-sub').textContent =
+      storeName + '\n' + tagCount + ' product' + (tagCount !== 1 ? 's' : '') + ' tagged in last session.';
+    document.getElementById('restore-banner').classList.add('show');
   }
 });
 
-// ── RESTORE SESSION ON PAGE LOAD ────────────────────────────
-window.addEventListener('load', function() {
-  if (loadProgress() && storeName && workerName) {
-    document.getElementById('header').style.display='flex';
-    document.getElementById('tab-bar').style.display='flex';
-    document.getElementById('status-bar').style.display='flex';
-    document.getElementById('header-sub').textContent=storeName;
-    document.getElementById('worker-badge').textContent='\u{1F464} '+workerName;
-    // Pre-fill setup form in case they want to see it
-    document.getElementById('inp-name').value=workerName;
-    document.getElementById('inp-store').value=storeName;
-    buildFilters();
-    switchTab('scanner');
-    setStatus('ok','Session restored – '+tagCount+' tagged');
-    updateCount();
-    updateUndoTab();
-    showToast('Session restored! '+tagCount+' tagged', 'ok');
-  }
-});
 </script>
