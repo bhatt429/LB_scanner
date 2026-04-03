@@ -607,25 +607,25 @@ function showResult(rawCode) {
 
 // ── APPLY TAG (scanner) ──────────────────────────────────────
 function applyTag(upc) {
-  const btnApply = document.getElementById('btn-apply');
-  if (btnApply) btnApply.style.display='none';
-  setSaving(true);
+  // Clear card and restart camera immediately on tap
+  const card = document.getElementById('result-card');
+  card.className='result-card'; card.innerHTML='';
+  currentUPC=null; lastScanned='';
+  if (!scannerOn) startScanner();
+
+  // Update state and save
   const alreadyTagged = taggedUPCs.has(upc);
   taggedUPCs.add(upc); lastTaggedUPC=upc;
-  renderList(); updateUndoTab();
+  if (!alreadyTagged) { tagCount++; }
+  updateCount(); renderList(); updateUndoTab(); saveProgress();
+  showToast('&#10003; Tagged!','ok');
+
+  // Fire-and-forget to Google Sheets
   fetch(storeUrl, {
     method:'POST', mode:'no-cors',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'tag', tab:document.getElementById('f-dept').value||'PRODUCE', upc, workerName})
-  }).then(() => {
-    setSaving(false); if (!alreadyTagged) { tagCount++; } updateCount(); saveProgress();
-    showToast('&#10003; Tagged!','ok');
-    // Auto-restart: clear card and resume camera immediately
-    const card = document.getElementById('result-card');
-    card.className='result-card'; card.innerHTML='';
-    currentUPC=null; lastScanned='';
-    if (!scannerOn) startScanner();
-  }).catch(() => { setSaving(false); showToast('Network error','err'); });
+  }).catch(() => showToast('Network error','err'));
 }
 
 // ── SCAN NEXT ────────────────────────────────────────────────
