@@ -160,9 +160,9 @@
 
   /* CAMERA */
   .scanner-wrap {
-    position:relative; width:100%; border-radius:16px;
+    position:relative; width:100%; border-radius:12px;
     overflow:hidden; background:#000; margin-bottom:10px;
-    box-shadow:0 4px 20px rgba(122,12,46,0.2); display:none;
+    display:none;
   }
   #qr-reader { border:none !important; padding:0 !important; width:100% !important; }
   #qr-reader video { width:100% !important; height:100% !important; object-fit:cover !important; border-radius:0 !important; }
@@ -381,6 +381,10 @@
 <div class="page" id="page-main">
   <div class="camera-top-bar">
     <div class="camera-top-inner">
+      <div class="scanner-wrap" id="scanner-wrap">
+        <div id="qr-reader"></div>
+        <div class="scan-overlay"><div class="scan-frame"><span></span><div class="scan-line"></div></div></div>
+      </div>
       <button class="btn-cam-start" id="btn-start" onclick="startScanner()">&#9654; &nbsp;Start Camera</button>
       <button class="btn-cam-stop"  id="btn-stop"  onclick="stopScanner()">&#9632; &nbsp;Stop Camera</button>
       <div class="scan-hint" id="scan-hint">Tap above to start scanning</div>
@@ -407,10 +411,6 @@
   </div>
 
   <div class="main-content">
-    <div class="scanner-wrap" id="scanner-wrap">
-      <div id="qr-reader"></div>
-      <div class="scan-overlay"><div class="scan-frame"><span></span><div class="scan-line"></div></div></div>
-    </div>
     <div id="result-card" class="result-card"></div>
     <div class="saving-indicator" id="saving-indicator">&#9203; Saving to sheet&#8230;</div>
     <div class="list-header">
