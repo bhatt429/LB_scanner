@@ -666,18 +666,31 @@ function showResult(rawCode) {
 
 // ── APPLY TAG (scanner) ──────────────────────────────────────
 function applyTag(upc) {
+	console.log("In apply tag for UPC -", upc);
   // Clear card and restart camera immediately on tap
   const card = document.getElementById('result-card');
   card.className='result-card'; card.innerHTML='';
   currentUPC=null; lastScanned='';
-  if (!scannerOn) startScanner();
+  if (!scannerOn) {
+	startScanner();
+  }
 
   // Update state and save
   const alreadyTagged = taggedUPCs.has(upc);
-  taggedUPCs.add(upc); lastTaggedUPC=upc;
-  if (!alreadyTagged) { tagCount++; }
-  updateCount(); renderList(); updateUndoTab(); saveProgress();
+  console.log("alreadyTagged  - ", alreadyTagged);
+  taggedUPCs.add(upc); 
+  console.log("taggedUPCs = ", taggedUPCs);
+  lastTaggedUPC=upc;
+  if (!alreadyTagged) {
+	tagCount++; 
+	}
+  updateCount();
+  renderList(); 
+  updateUndoTab(); 
+  saveProgress();
   showToast('&#10003; Tagged!','ok');
+  
+  console.log("the dept is - ", document.getElementById('f-dept').value);
 
   // Fire-and-forget to Google Sheets
   fetch(storeUrl, {
