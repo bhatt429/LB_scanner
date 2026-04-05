@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>L&B Label Scanner</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;500;700;900&display=swap');
+  :root {
+    --maroon:#7A0C2E; --maroon-dark:#5a0920;
+    --gold:#F0B722; --orange:#E07020;
+    --cream:#F5F0E8; --white:#ffffff;
+    --text:#1a0a10; --muted:#9a7a84; --border:#ddd0d4;
+    --success:#1a7a42; --success-bg:#edfaf3;
+    --error:#c0182e; --error-bg:#fff0f2;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--cream); color:var(--text); font-family:"DM Sans",sans-serif; min-height:100vh; overflow-x:hidden; width:100%; }
+  html { overflow-x:hidden; }
+
+
+  /* RESTORE BANNER */
+  .restore-banner {
+    display:none; position:fixed; inset:0; z-index:999;
+    background:rgba(0,0,0,0.55); align-items:center; justify-content:center;
+  }
+  .restore-banner.show { display:flex; }
+  .restore-card {
+    background:var(--white); border-radius:18px; padding:28px 22px;
+    max-width:340px; width:90%; text-align:center;
+    box-shadow:0 8px 32px rgba(0,0,0,0.25);
+  }
+  .restore-icon  { font-size:36px; margin-bottom:10px; }
+  .restore-title { font-size:17px; font-weight:900; color:var(--maroon); margin-bottom:6px; }
+  .restore-sub   { font-size:13px; color:var(--muted); margin-bottom:20px; line-height:1.5; }
+  .restore-btns  { display:flex; flex-direction:column; gap:10px; }
+  .btn-restore-continue { background:var(--success); color:#fff; padding:14px; border-radius:12px; border:none; font-family:"DM Sans",sans-serif; font-weight:700; font-size:15px; cursor:pointer; }
+  .btn-restore-new      { background:var(--cream); color:var(--maroon); padding:14px; border-radius:12px; border:2px solid var(--border); font-family:"DM Sans",sans-serif; font-weight:700; font-size:15px; cursor:pointer; }
+
+  /* HEADER */
+  .header {
+    background:var(--maroon); padding:12px 16px;
+    display:flex; align-items:center; justify-content:space-between;
+    position:sticky; top:0; z-index:100;
+    box-shadow:0 2px 8px rgba(122,12,46,0.3);
+  }
+  .header-title { color:#fff; font-size:15px; font-weight:900; }
+  .header-sub { color:rgba(255,255,255,0.65); font-size:11px; }
+  .worker-badge {
+    background:var(--gold); color:var(--maroon-dark);
+    font-family:"Space Mono",monospace; font-size:11px; font-weight:700;
+    padding:4px 10px; border-radius:20px; cursor:pointer; white-space:nowrap;
+  }
+
+  /* TAB BAR */
+  .tab-bar {
+    background:var(--white); border-bottom:2px solid var(--border);
+    display:none; position:sticky; top:52px; z-index:99;
+    box-shadow:0 2px 4px rgba(0,0,0,0.06);
+  }
+  .tab-bar-inner { display:flex; max-width:480px; margin:0 auto; }
+  .tab-btn {
+    flex:1; padding:11px 4px; border:none; background:none;
+    font-family:"DM Sans",sans-serif; font-size:12px; font-weight:700;
+    color:var(--muted); cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    border-bottom:3px solid transparent;
+  }
+  .tab-btn.active { color:var(--maroon); border-bottom-color:var(--maroon); }
+  .tab-icon { font-size:17px; }
+
+  /* PAGES */
+  .page { display:none; }
+  .page.active { display:block; }
+
+  /* SETUP */
+  .setup-wrap { padding:20px; max-width:480px; margin:0 auto; }
+  .setup-card {
+    background:var(--white); border-radius:16px;
+    padding:28px 24px; box-shadow:0 2px 12px rgba(122,12,46,0.1); margin-top:24px;
+  }
+  .setup-logo { text-align:center; margin-bottom:24px; }
+  .setup-logo-text { font-size:28px; font-weight:900; color:var(--maroon); }
+  .setup-logo-sub { font-size:13px; color:var(--muted); margin-top:4px; }
+  .field-label {
+    font-size:11px; font-weight:700; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--muted); margin-bottom:6px;
+    font-family:"Space Mono",monospace;
+  }
+  .field-wrap { margin-bottom:16px; }
+  .field-input {
+    width:100%; padding:13px 15px; border-radius:12px;
+    border:2px solid var(--border); background:var(--cream);
+    color:var(--text); font-family:"DM Sans",sans-serif; font-size:15px;
+    outline:none; transition:border 0.2s; appearance:none; -webkit-appearance:none;
+  }
+  .field-input:focus { border-color:var(--maroon); }
+  .btn-primary {
+    display:block; width:100%; padding:15px; border-radius:12px;
+    border:none; background:var(--maroon); color:#fff;
+    font-family:"DM Sans",sans-serif; font-weight:700; font-size:15px; cursor:pointer;
+  }
+  .btn-primary:active { background:var(--maroon-dark); }
+
+  /* CAMERA TOP BAR */
+  .camera-top-bar {
+    background:var(--cream); border:3px solid var(--maroon);
+    margin:10px 12px 0; border-radius:14px;
+    padding:14px 12px 12px; z-index:91;
+  }
+  .camera-top-inner { max-width:480px; margin:0 auto; }
+  .btn-cam-start {
+    display:block; width:100%; padding:18px; border-radius:12px; border:none;
+    background:var(--maroon); color:#fff;
+    font-family:"DM Sans",sans-serif; font-weight:900; font-size:18px; cursor:pointer;
+  }
+  .btn-cam-stop {
+    display:none; width:100%; padding:18px; border-radius:12px; border:none;
+    background:var(--error); color:#fff;
+    font-family:"DM Sans",sans-serif; font-weight:900; font-size:18px; cursor:pointer;
+  }
+  .scan-hint {
+    text-align:center; font-size:13px; font-weight:700; color:var(--maroon);
+    font-family:"DM Sans",sans-serif; padding:10px 0 2px;
+    animation:hintBlink 1.2s ease-in-out infinite;
+  }
+  @keyframes hintBlink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* FILTER BAR (scanner tab) */
+  .filter-bar {
+    background:var(--white); border-bottom:2px solid var(--border);
+    padding:10px 12px; position:sticky; top:165px; z-index:90;
+    box-shadow:0 2px 6px rgba(0,0,0,0.05);
+  }
+  .filter-bar-inner { max-width:480px; margin:0 auto; }
+  .filter-row { display:flex; gap:6px; margin-bottom:6px; }
+  .filter-row:last-of-type { margin-bottom:0; }
+  .filter-select {
+    flex:1; min-width:0; padding:9px 8px; border-radius:10px;
+    border:2px solid var(--border); background:var(--cream);
+    color:var(--text); font-family:"DM Sans",sans-serif;
+    font-size:12px; font-weight:600; outline:none;
+    appearance:none; -webkit-appearance:none; transition:border 0.2s;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .filter-select:focus { border-color:var(--maroon); }
+  .filter-counter {
+    font-size:11px; color:var(--muted); font-family:"Space Mono",monospace;
+    margin-top:6px; line-height:1.7;
+  }
+  .filter-counter-row { display:flex; justify-content:space-between; padding:0 2px; }
+  .filter-counter-label { color:var(--text); font-weight:700; }
+  .filter-counter-nums { color:var(--muted); }
+  .filter-counter-nums span.rem { color:var(--maroon); font-weight:700; }
+  .filter-counter-nums span.tag { color:var(--success); font-weight:700; }
+
+  /* MAIN CONTENT */
+  .main-content { max-width:480px; margin:0 auto; padding:12px 14px 80px; }
+
+  /* CAMERA */
+  .scanner-wrap {
+    position:relative; width:100%; border-radius:12px;
+    overflow:hidden; background:#000; margin-bottom:10px;
+    display:none;
+  }
+  #qr-reader { border:none !important; padding:0 !important; width:100% !important; }
+  #qr-reader video { width:100% !important; height:100% !important; object-fit:cover !important; border-radius:0 !important; }
+  #qr-reader img { display:none !important; }
+  #qr-reader__scan_region { padding:0 !important; }
+  #qr-reader__dashboard { display:none !important; }
+  .scan-overlay {
+    position:absolute; inset:0; pointer-events:none;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .scan-frame { width:75%; height:30%; position:relative; }
+  .scan-frame::before,.scan-frame::after,.scan-frame span::before,.scan-frame span::after {
+    content:""; position:absolute; width:24px; height:24px;
+    border-color:var(--gold); border-style:solid;
+  }
+  .scan-frame::before { top:0;left:0;border-width:3px 0 0 3px;border-radius:3px 0 0 0; }
+  .scan-frame::after  { top:0;right:0;border-width:3px 3px 0 0;border-radius:0 3px 0 0; }
+  .scan-frame span::before { bottom:0;left:0;border-width:0 0 3px 3px;border-radius:0 0 0 3px; }
+  .scan-frame span::after  { bottom:0;right:0;border-width:0 3px 3px 0;border-radius:0 0 3px 0; }
+  .scan-line {
+    position:absolute; left:4%; right:4%; height:2px;
+    background:linear-gradient(90deg,transparent,var(--gold),transparent);
+    animation:scanline 2s ease-in-out infinite; box-shadow:0 0 10px var(--gold);
+  }
+  @keyframes scanline { 0%{top:4%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:96%;opacity:0} }
+
+  .camera-btn-row { display:none; }
+
+  /* RESULT CARD */
+  .result-card {
+    border-radius:16px; padding:20px; margin-bottom:10px;
+    display:none; border:2px solid transparent;
+    animation:popIn 0.25s cubic-bezier(0.175,0.885,0.32,1.275);
+  }
+  .result-card.show  { display:block; }
+  .result-card.found { background:var(--success-bg); border-color:#a8e6c3; }
+  .result-card.miss  { background:var(--error-bg);   border-color:#f5b8c0; }
+  @keyframes popIn { from{transform:scale(0.93) translateY(6px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
+  .result-label { font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;font-weight:700;font-family:"Space Mono",monospace; }
+  .result-code  { font-family:"Space Mono",monospace;font-size:12px;font-weight:700;color:var(--maroon);margin-bottom:10px;word-break:break-all; }
+  .result-brand { font-size:13px;color:var(--muted);margin-bottom:2px;font-weight:500; }
+  .result-desc  { font-size:18px;font-weight:900;line-height:1.2;margin-bottom:12px;word-break:break-word; }
+  .tag-box { border-radius:10px;padding:12px 14px;margin-bottom:14px;border:2px solid; }
+  .tag-box.mim    { background:#1a3a6e12;border-color:#1a3a6e40; }
+  .tag-box.mgrown { background:#1a5c2a12;border-color:#1a5c2a40; }
+  .tag-label { font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;font-family:"Space Mono",monospace; }
+  .tag-box.mim    .tag-label { color:#1a3a6e; }
+  .tag-box.mgrown .tag-label { color:#1a5c2a; }
+  .tag-name { font-size:16px;font-weight:900; }
+  .tag-box.mim    .tag-name { color:#1a3a6e; }
+  .tag-box.mgrown .tag-name { color:#1a5c2a; }
+  .do-not-tag-box {
+    background:var(--error-bg);border:2px solid #f5b8c0;
+    border-radius:10px;padding:16px;margin-bottom:14px;text-align:center;
+  }
+  .do-not-tag-title { font-size:22px;font-weight:900;color:var(--error); }
+  .btn-big {
+    display:block;width:100%;padding:16px;border-radius:12px;border:none;
+    font-family:"DM Sans",sans-serif;font-weight:700;font-size:16px;cursor:pointer;transition:opacity 0.15s;
+  }
+  .btn-big:active { opacity:0.85; }
+  .btn-big-green { background:var(--success);color:#fff; }
+  .btn-big-red   { background:var(--error);color:#fff; }
+  .saving-indicator { text-align:center;padding:6px;font-size:12px;color:var(--muted);display:none; }
+
+  /* PRODUCT LIST */
+  .list-header {
+    font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;
+    color:var(--muted);font-family:"Space Mono",monospace;
+    padding:10px 0 6px;display:flex;justify-content:space-between;
+  }
+  .product-item {
+    background:var(--white);border-radius:13px;padding:12px 13px;
+    border:2px solid var(--border);display:flex;align-items:center;
+    justify-content:space-between;gap:8px;margin-bottom:8px;
+    min-width:0; overflow:hidden;
+  }
+  .product-item-info { flex:1;min-width:0; }
+  .product-item-brand { font-size:11px;color:var(--muted);font-weight:600;margin-bottom:2px; }
+  .product-item-desc { font-size:14px;font-weight:700;line-height:1.2;margin-bottom:3px;word-break:break-word; }
+  .product-item-upc { font-family:"Space Mono",monospace;font-size:10px;color:var(--muted); }
+  .product-item-actions { display:flex;flex-direction:column;gap:5px;align-items:flex-end;flex-shrink:0; }
+  .tag-badge { font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px;white-space:nowrap; }
+  .tag-badge.mim    { background:#1a3a6e20;color:#1a3a6e; }
+  .tag-badge.mgrown { background:#1a5c2a20;color:#1a5c2a; }
+  .lb-link {
+    display:inline-block;padding:7px 11px;border-radius:9px;
+    background:var(--maroon);color:#fff;font-size:11px;font-weight:700;
+    text-decoration:none;white-space:nowrap;
+  }
+  .empty-state { text-align:center;padding:40px 20px;color:var(--muted);font-size:14px; }
+
+  /* MANUAL TAB */
+  .tab-content-wrap { max-width:480px;margin:0 auto;padding:20px 14px 80px; }
+  .tab-card {
+    background:var(--white);border-radius:16px;padding:24px 20px;
+    box-shadow:0 2px 10px rgba(122,12,46,0.08);
+  }
+  .tab-card-title { font-size:16px;font-weight:900;color:var(--maroon);margin-bottom:6px; }
+  .tab-card-sub { font-size:13px;color:var(--muted);margin-bottom:18px; }
+  .manual-row { display:flex;gap:8px; }
+  .manual-input {
+    flex:1;padding:14px 15px;border-radius:12px;
+    border:2px solid var(--border);background:var(--cream);
+    color:var(--text);font-family:"Space Mono",monospace;font-size:15px;
+    outline:none;transition:border 0.2s;
+  }
+  .manual-input:focus { border-color:var(--maroon); }
+  .manual-go {
+    padding:14px 20px;border-radius:12px;border:none;
+    background:var(--maroon);color:#fff;
+    font-family:"DM Sans",sans-serif;font-weight:700;font-size:16px;cursor:pointer;
+  }
+
+  /* UNDO TAB */
+  .undo-last-info {
+    background:var(--cream);border-radius:12px;padding:14px;
+    margin-bottom:16px;font-size:13px;color:var(--text);display:none;
+  }
+  .undo-last-info.show { display:block; }
+  .btn-undo-big {
+    display:block;width:100%;padding:16px;border-radius:12px;border:none;
+    background:var(--orange);color:#fff;
+    font-family:"DM Sans",sans-serif;font-weight:700;font-size:16px;cursor:pointer;
+  }
+  .btn-undo-big:disabled { opacity:0.4;cursor:not-allowed; }
+
+  /* STATUS BAR */
+  .status-bar {
+    background:var(--white);border-top:1px solid var(--border);
+    padding:8px 16px;display:flex;justify-content:space-between;
+    font-size:11px;color:var(--muted);font-family:"Space Mono",monospace;
+    position:fixed;bottom:0;left:0;right:0;z-index:80;
+  }
+  .dot { display:inline-block;width:7px;height:7px;border-radius:50%;background:#ccc;margin-right:5px;vertical-align:middle; }
+  .dot.on  { background:var(--gold);animation:pulse 1.5s infinite; }
+  .dot.ok  { background:var(--success); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .toast {
+    position:fixed;bottom:48px;left:50%;
+    transform:translateX(-50%) translateY(80px);
+    background:var(--maroon);color:#fff;
+    padding:11px 22px;border-radius:30px;
+    font-weight:700;font-size:13px;z-index:999;
+    transition:transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275);
+    white-space:nowrap;box-shadow:0 4px 16px rgba(122,12,46,0.4);pointer-events:none;
+  }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+  .toast.ok   { background:var(--success); }
+  .toast.warn { background:var(--orange); }
+  .toast.err  { background:var(--error); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header" id="header" style="display:none;">
+  <div>
+    <div class="header-title">L&amp;B Label Scanner</div>
+    <div class="header-sub" id="header-sub"></div>
+  </div>
+  <div class="worker-badge" id="worker-badge" onclick="changeWorker()">&#128100; &#8212;</div>
+</div>
+
+<!-- TAB BAR -->
+<div class="tab-bar" id="tab-bar">
+  <div class="tab-bar-inner">
+    <button class="tab-btn active" id="tab-scanner" onclick="switchTab('scanner')">
+      <span class="tab-icon">&#128247;</span><span>Scanner</span>
+    </button>
+    <button class="tab-btn" id="tab-manual" onclick="switchTab('manual')">
+      <span class="tab-icon">&#9998;&#65039;</span><span>Manual</span>
+    </button>
+    <button class="tab-btn" id="tab-undo" onclick="switchTab('undo')">
+      <span class="tab-icon">&#8617;</span><span>Undo</span>
+    </button>
+  </div>
+</div>
+
+<!-- PAGE: SETUP -->
+<div class="page active" id="page-setup">
+  <div class="setup-wrap">
+    <div class="setup-card">
+      <div class="setup-logo">
+        <div class="setup-logo-text">L&amp;B Scanner</div>
+        <div class="setup-logo-sub">MDA Label Compliance Tool</div>
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Your Name</div>
+        <input class="field-input" id="inp-name" type="text" placeholder="e.g. Sarah"
+          autocomplete="off" onkeydown="if(event.key==='Enter') document.getElementById('inp-store').focus()">
+      </div>
+      <div class="field-wrap">
+        <div class="field-label">Store</div>
+        <select class="field-input" id="inp-store">
+          <option value="">&#8212; Select store &#8212;</option>
+          <option>Golden Valley</option>
+          <option>St. Louis Park</option>
+          <option>Burnsville</option>
+          <option>Chanhassen</option>
+          <option>Eagan</option>
+          <option>Maple Grove</option>
+          <option>Woodbury</option>
+          <option>Plymouth</option>
+          <option>White Bear Lake</option>
+        </select>
+      </div>
+      <button class="btn-primary" onclick="startSession()">Start Scanning &#8594;</button>
+      <div id="setup-err" style="text-align:center;font-size:12px;color:var(--error);margin-top:8px;min-height:18px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE: SCANNER (main) -->
+<div class="page" id="page-main">
+  <div class="camera-top-bar">
+    <div class="camera-top-inner">
+      <div class="scanner-wrap" id="scanner-wrap">
+        <div id="qr-reader"></div>
+        <div class="scan-overlay"><div class="scan-frame"><span></span><div class="scan-line"></div></div></div>
+      </div>
+      <button class="btn-cam-start" id="btn-start" onclick="startScanner()">&#9654; &nbsp;Start Camera</button>
+      <button class="btn-cam-stop"  id="btn-stop"  onclick="stopScanner()">&#9632; &nbsp;Stop Camera</button>
+      <div class="scan-hint" id="scan-hint">Tap above to start scanning</div>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <div class="filter-bar-inner">
+      <div class="filter-row">
+        <select class="filter-select" id="f-dept" onchange="onDeptChange()">
+          <option value="">&#8212; All Departments &#8212;</option>
+        </select>
+      </div>
+      <div class="filter-row">
+        <select class="filter-select" id="f-cat" onchange="onCatChange()">
+          <option value="">&#8212; All Categories &#8212;</option>
+        </select>
+        <select class="filter-select" id="f-sub" onchange="renderList()">
+          <option value="">&#8212; All Subcategories &#8212;</option>
+        </select>
+      </div>
+      <div class="filter-counter" id="filter-counter"></div>
+    </div>
+  </div>
+
+  <div class="main-content">
+    <div id="result-card" class="result-card"></div>
+    <div class="saving-indicator" id="saving-indicator">&#9203; Saving to sheet&#8230;</div>
+    <div class="list-header">
+      <span>Products to Label</span>
+      <span id="list-count"></span>
+    </div>
+    <div id="product-list"></div>
+  </div>
+</div>
+
+<!-- PAGE: MANUAL -->
+<div class="page" id="page-manual">
+  <div class="tab-content-wrap">
+    <div class="tab-card">
+      <div class="tab-card-title">Manual UPC Entry</div>
+      <div class="tab-card-sub">Type a UPC to look up and tag a product</div>
+      <div class="manual-row">
+        <input class="manual-input" id="manual-upc" type="text"
+          inputmode="numeric" placeholder="Type UPC&#8230;"
+          onkeydown="if(event.key==='Enter') lookupManual()">
+        <button class="manual-go" onclick="lookupManual()">&#8594;</button>
+      </div>
+    </div>
+    <div id="manual-result" style="margin-top:12px;"></div>
+  </div>
+</div>
+
+<!-- PAGE: UNDO -->
+<div class="page" id="page-undo">
+  <div class="tab-content-wrap">
+    <div class="tab-card">
+      <div class="tab-card-title">Undo Last Tag</div>
+      <div class="tab-card-sub">Removes the most recently applied tag from the sheet</div>
+      <div class="undo-last-info" id="undo-info"></div>
+      <button class="btn-undo-big" id="btn-undo-big" onclick="undoLast()" disabled>&#8617; &nbsp;Undo Last Tag</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- RESTORE SESSION BANNER -->
+<div class="restore-banner" id="restore-banner">
+  <div class="restore-card">
+    <div class="restore-icon">👋</div>
+    <div class="restore-title" id="restore-title">Welcome back!</div>
+    <div class="restore-sub" id="restore-sub"></div>
+    <div class="restore-btns">
+      <button class="btn-restore-continue" onclick="continueSession()">✓ &nbsp;Continue Session</button>
+      <button class="btn-restore-new"      onclick="newSession()">↩ &nbsp;Start New Session</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar" id="status-bar" style="display:none;">
+  <span><span class="dot" id="dot"></span><span id="status-txt">Ready</span></span>
+  <span id="count-txt">0 tagged</span>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const PRODUCTS = {"860003772621":{"brand":"Duluth Cider","desc":"DULUTH CIDER TRAILSIDE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD CIDERS","dept":"BEER"},"860003772614":{"brand":"Duluth Cider","desc":"DULUTH CIDER GITCH","mda":"Made in Minnesota","note":"Not flagged as local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD CIDERS","dept":"BEER"},"857463006069":{"brand":"Loon Juice","desc":"LOON JUICE VARIETY PACK","mda":"Made in Minnesota","note":"Not flagged as local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD CIDERS","dept":"BEER"},"866375000027":{"brand":"Loon Juice","desc":"LOON JUICE HONEY CRISP","mda":"Made in Minnesota","note":"Flagged as Local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD CIDERS","dept":"BEER"},"857463006205":{"brand":"Loon Juice","desc":"LOON JUICE GROW A PEAR","mda":"Made in Minnesota","note":"Not flagged as local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD CIDERS","dept":"BEER"},"857463006120":{"brand":"Loon Juice","desc":"LOON JUICE HONEYCRISP","mda":"Made in Minnesota","note":"Not flagged as local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD CIDERS","dept":"BEER"},"857463006847":{"brand":"Loon Juice","desc":"LOON JUICE ORANGE AGAVE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD CIDERS","dept":"BEER"},"850016933027":{"brand":"Minneapolis Cider Co.","desc":"MPLS CIDER MANGO HABANERO","mda":"Made in Minnesota","note":"Flagged as Local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD CIDERS","dept":"BEER"},"850016933164":{"brand":"Minneapolis Cider Co.","desc":"MPLS CIDER BLUEBERRY BOREALIS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD CIDERS","dept":"BEER"},"850016933003":{"brand":"Minneapolis Cider Co.","desc":"MPLS CIDER ORCHARD BLEND","mda":"Made in Minnesota","note":"Flagged as Local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD CIDERS","dept":"BEER"},"810023140818":{"brand":"Fulton Brewing","desc":"FULTON LEMONADE SELTZER VP","mda":"Made in Minnesota","note":"Flagged as Local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD SELTZERS","dept":"BEER"},"810023140399":{"brand":"Fulton Brewing","desc":"FULTON SELTZER FRUITY PACK","mda":"Made in Minnesota","note":"Flagged as Local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD SELTZERS","dept":"BEER"},"856247003973":{"brand":"Fulton Brewing","desc":"FULTON SELTZER CITRUS VARIETY","mda":"Made in Minnesota","note":"Not flagged as local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD SELTZERS","dept":"BEER"},"850007526269":{"brand":"Urban Growler","desc":"URBAN GROWLER LEMONADE SLTZR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD SELTZERS","dept":"BEER"},"850007526450":{"brand":"Urban Growler","desc":"URBAN GROWLER PNK LMND HARD S","mda":"Made in Minnesota","note":"Flagged as Local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD SELTZERS","dept":"BEER"},"850007526290":{"brand":"Urban Growler","desc":"URBAN GROWLER BASIL LIMADE SZR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD SELTZERS","dept":"BEER"},"855789008941":{"brand":"Wooden Hill","desc":"WOODEN HILL MOSCOW MULE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD SELTZERS","dept":"BEER"},"855789008750":{"brand":"Wooden Hill","desc":"WOODEN HILL MOJITO SELTZER","mda":"Made in Minnesota","note":"Not flagged as local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD SELTZERS","dept":"BEER"},"855789008897":{"brand":"Wooden Hill","desc":"WOODEN HILL PINK LEMONADE SLTZ","mda":"Made in Minnesota","note":"Not flagged as local","cat":"FLAVORED MALT BEVERAGES","sub":"HARD SELTZERS","dept":"BEER"},"25569121256":{"brand":"Summit Brewing Company","desc":"SUMMIT LIGHT LAGER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"MICROBREWED","sub":"LIGHT","dept":"BEER"},"25569121287":{"brand":"Summit Brewing Company","desc":"SUMMIT LIGHT LAGER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"MICROBREWED","sub":"LIGHT","dept":"BEER"},"854411005020":{"brand":"Bauhaus Brewing","desc":"BAUHAUS WONDERSTUFF","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"854411005402":{"brand":"Bauhaus Brewing","desc":"BAUHAUS LOUNGE WIZARD","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"854411005570":{"brand":"Bauhaus Brewing","desc":"BAUHAUS GUAVATRON","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"854411005204":{"brand":"Bauhaus Brewing","desc":"BAUHAUS MANY PACK","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852449007405":{"brand":"Utepils","desc":"UTEPILS HEFEWEIZEN","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852449007825":{"brand":"Utepils","desc":"UTEPILS SPRINGBOK","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852449007726":{"brand":"Utepils","desc":"UTEPILS HELLES","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852449007504":{"brand":"Utepils","desc":"UTEPILS KOLSCH","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852449007030":{"brand":"Utepils","desc":"UTEPILS LOONAR ECLIPSE","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852449007108":{"brand":"Utepils","desc":"UTEPILS PILS","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"850034657424":{"brand":"Indeed Brewing","desc":"INDEED HOP PARADE IPA VARIETY","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852004004924":{"brand":"Indeed Brewing","desc":"INDEED FLAVORWAVE","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852004004184":{"brand":"Indeed Brewing","desc":"INDEED MEXICAN HONEY","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"850034657578":{"brand":"Indeed Brewing","desc":"INDEED YAMMA JAMMA","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"850034657547":{"brand":"Indeed Brewing","desc":"INDEED IMPERIAL PSTCHO CREME","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852004004528":{"brand":"Indeed Brewing","desc":"INDEED MEXICAN HONEY LIGHT","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852004004054":{"brand":"Indeed Brewing","desc":"INDEED LSD HONEY","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852004004009":{"brand":"Indeed Brewing","desc":"INDEED DAY TRIPPER PALE ALE","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852004004429":{"brand":"Indeed Brewing","desc":"INDEED FLAVORWAVE","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"852004004917":{"brand":"Indeed Brewing","desc":"INDEED PISTACHIO CREAM ALE","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"893354001201":{"brand":"Surly","desc":"SURLY TODD THE AXE MAN","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"810005491266":{"brand":"Surly","desc":"SURLY SELECTS VARIETY PACK","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"893354001485":{"brand":"Surly","desc":"SURLY HELL","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"893354001027":{"brand":"Surly","desc":"SURLY FURIOUS","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"893354001515":{"brand":"Surly","desc":"SURLY FURIOUS","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"810005492058":{"brand":"Surly","desc":"SURLY NIIICE","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"893354001904":{"brand":"Surly","desc":"SURLY FURIOUS","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"810005490801":{"brand":"Surly","desc":"SURLY MOSH PIT JUICY","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"719104789222":{"brand":"Excelsior Brewing","desc":"EXCELSIOR BRIDGE IPA","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"719104789239":{"brand":"Excelsior Brewing","desc":"EXCELSIOR BAYSIDE BROWN","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"719104789345":{"brand":"Excelsior Brewing","desc":"EXCELSIOR BIG ISLAND BLOND","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"719104789277":{"brand":"Excelsior Brewing","desc":"EXCELSIOR DOCK BOX","mda":"Made in Minnesota","note":"","cat":"MICROBREWED","sub":"REGULAR","dept":"BEER"},"41483036124":{"brand":"Kemps","desc":"KEMPS NF COTTAGE CHEESE","mda":"MN Grown","note":"Flagged as Local","cat":"COTTAGE CHEESE","sub":"COTTAGE CHEESE","dept":"DAIRY"},"41483011626":{"brand":"Kemps","desc":"KEMPS 4% LARGE COTTAGE CHEESE","mda":"MN Grown","note":"Flagged as Local","cat":"COTTAGE CHEESE","sub":"COTTAGE CHEESE","dept":"DAIRY"},"41483043658":{"brand":"Kemps","desc":"KEMPS PINEAPPLE COTTAGE CHEESE","mda":"MN Grown","note":"Flagged as Local","cat":"COTTAGE CHEESE","sub":"COTTAGE CHEESE","dept":"DAIRY"},"41483038340":{"brand":"Kemps","desc":"KEMPS CHIVES COTTAGE CHEESE","mda":"MN Grown","note":"Flagged as Local","cat":"COTTAGE CHEESE","sub":"COTTAGE CHEESE","dept":"DAIRY"},"41483017109":{"brand":"Kemps","desc":"KEMPS FAT FREE COTTAGE CHEESE","mda":"MN Grown","note":"Flagged as Local","cat":"COTTAGE CHEESE","sub":"COTTAGE CHEESE","dept":"DAIRY"},"41483042125":{"brand":"Kemps","desc":"KEMPS BERRY COTTAGE CHEESE","mda":"MN Grown","note":"Flagged as Local","cat":"COTTAGE CHEESE","sub":"COTTAGE CHEESE","dept":"DAIRY"},"41483036186":{"brand":"Kemps","desc":"KEMPS 4% COTTAGE CHEESE","mda":"MN Grown","note":"Flagged as Local","cat":"COTTAGE CHEESE","sub":"COTTAGE CHEESE","dept":"DAIRY"},"41483041579":{"brand":"Kemps","desc":"KEMPS SM CURD CHIVE COTTAGE CH","mda":"MN Grown","note":"Flagged as Local","cat":"COTTAGE CHEESE","sub":"COTTAGE CHEESE","dept":"DAIRY"},"41483040138":{"brand":"Kemps","desc":"KEMPS 4% COTTAGE CHEESE","mda":"MN Grown","note":"Flagged as Local","cat":"COTTAGE CHEESE","sub":"COTTAGE CHEESE","dept":"DAIRY"},"41483036070":{"brand":"Kemps","desc":"KEMPS 1% LF COTTAGE CHEESE","mda":"MN Grown","note":"Flagged as Local","cat":"COTTAGE CHEESE","sub":"COTTAGE CHEESE","dept":"DAIRY"},"41483042613":{"brand":"Kemps","desc":"KEMPS FRENCH ONION DIP","mda":"MN Grown","note":"Flagged as Local","cat":"DIPS","sub":"DIPS","dept":"DAIRY"},"41483042576":{"brand":"Kemps","desc":"KEMPS FRENCH ONION DIP","mda":"MN Grown","note":"Flagged as Local","cat":"DIPS","sub":"DIPS","dept":"DAIRY"},"14601658003":{"brand":"Hope Creamery","desc":"HOPE BUTTER HIGH FAT UNSALTED","mda":"MN Grown","note":"","cat":"MARGARINE AND BUTTER","sub":"BUTTER","dept":"DAIRY"},"14601342001":{"brand":"Hope Creamery","desc":"HOPE BUTTER SOLID REGULAR","mda":"MN Grown","note":"","cat":"MARGARINE AND BUTTER","sub":"BUTTER","dept":"DAIRY"},"14601614009":{"brand":"Hope Creamery","desc":"HOPE BUTTER SOLID UNSALTED","mda":"MN Grown","note":"","cat":"MARGARINE AND BUTTER","sub":"BUTTER","dept":"DAIRY"},"72431171413":{"brand":"Minnesota Creamery","desc":"MN CREAMERY BUTTER UNSALTED","mda":"MN Grown","note":"","cat":"MARGARINE AND BUTTER","sub":"BUTTER","dept":"DAIRY"},"72431170720":{"brand":"Minnesota Creamery","desc":"MN CREAMERY BUTTER","mda":"MN Grown","note":"","cat":"MARGARINE AND BUTTER","sub":"BUTTER","dept":"DAIRY"},"72431170966":{"brand":"Minnesota Creamery","desc":"MN CREAMERY 1% MILK","mda":"MN Grown","note":"","cat":"MILK","sub":"GALLON","dept":"DAIRY"},"72431170973":{"brand":"Minnesota Creamery","desc":"MN CREAMERY SKIM MILK","mda":"MN Grown","note":"","cat":"MILK","sub":"GALLON","dept":"DAIRY"},"72431170959":{"brand":"Minnesota Creamery","desc":"MN CREAMERY 2% MILK","mda":"MN Grown","note":"","cat":"MILK","sub":"GALLON","dept":"DAIRY"},"72431171123":{"brand":"Lunds & Byerlys","desc":"L&B WHOLE CLASSIC MILK","mda":"MN Grown","note":"","cat":"MILK","sub":"GALLON","dept":"DAIRY"},"72431171147":{"brand":"Lunds & Byerlys","desc":"L&B 1% CLASSIC MILK","mda":"MN Grown","note":"","cat":"MILK","sub":"GALLON","dept":"DAIRY"},"41483042514":{"brand":"Kemps","desc":"KEMPS SOUR CREAM LITE","mda":"MN Grown","note":"Flagged as Local","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"41483044402":{"brand":"Kemps","desc":"KEMPS MEX STYLE SOUR CREAM","mda":"MN Grown","note":"Flagged as Local","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"41483027481":{"brand":"Kemps","desc":"KEMPS SOUR CREAM SQUEEZE","mda":"MN Grown","note":"Flagged as Local","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"41483011794":{"brand":"Kemps","desc":"KEMPS SOUR CREAM","mda":"MN Grown","note":"Flagged as Local","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"41483036889":{"brand":"Kemps","desc":"KEMPS SOUR CREAM","mda":"MN Grown","note":"Flagged as Local","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"41483011800":{"brand":"Kemps","desc":"KEMPS SOUR CREAM","mda":"MN Grown","note":"Flagged as Local","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"41483036896":{"brand":"Mid America Farms","desc":"MID AMERICA CHIVE TOP TATER","mda":"MN Grown","note":"","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"41483039385":{"brand":"Mid America Farms","desc":"MID AMERICA CHVE SQZ TOP TATER","mda":"MN Grown","note":"","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"41483038494":{"brand":"Mid America Farms","desc":"MID AMERICA BUFFALO TOP TATER","mda":"MN Grown","note":"","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"70801648008":{"brand":"Mid America Farms","desc":"MID AMERICA TOP THE TATER","mda":"MN Grown","note":"","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"41483038487":{"brand":"Mid America Farms","desc":"MID AMERICA FIESTA TOP TATER","mda":"MN Grown","note":"","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"41483045003":{"brand":"Mid America Farms","desc":"MID AMERICA TOP THE TATOR","mda":"MN Grown","note":"","cat":"SOUR CREAM","sub":"SOUR CREAM","dept":"DAIRY"},"855207004746":{"brand":"Bare Honey","desc":"BARE HONEY FARMSTAND SOLAR","mda":"MN Grown","note":"Flagged as Local","cat":"DELI CONDIMENTS","sub":"DELI PRESERVES","dept":"DELI"},"855207004838":{"brand":"Bare Honey","desc":"BARE HONEY BEEKEEPER","mda":"MN Grown","note":"Flagged as Local","cat":"DELI CONDIMENTS","sub":"DELI PRESERVES","dept":"DELI"},"264050000001":{"brand":"Shepherd's Way Farms","desc":"SHEPHERDS WAY FARM SOGN TOMME","mda":"MN Grown","note":"Flagged as Local","cat":"SPECIALTY CHEESE","sub":"SPECIALTY CHEESE AMERICAN ORIGINAL","dept":"DELI"},"264182000009":{"brand":"Shepherd's Way Farms","desc":"SHEPHERD'S WAY FRIESAGO","mda":"MN Grown","note":"Flagged as Local","cat":"SPECIALTY CHEESE","sub":"SPECIALTY CHEESE AMERICAN ORIGINAL","dept":"DELI"},"264226000002":{"brand":"Shepherd's Way Farms","desc":"SHEPHERDS BIG WOODS BLUE","mda":"MN Grown","note":"Flagged as Local","cat":"SPECIALTY CHEESE","sub":"SPECIALTY CHEESE BLUE","dept":"DELI"},"264497000008":{"brand":"Shepherd's Way Farms","desc":"SHEPHERDS WAY HIDDN FALLS CH","mda":"MN Grown","note":"Flagged as Local","cat":"SPECIALTY CHEESE","sub":"SPECIALTY CHEESE SOFT RIPENED","dept":"DELI"},"264052000009":{"brand":"Shepherd's Way Farms","desc":"SHEPHERD'S WAY MORCELLA","mda":"MN Grown","note":"Flagged as Local","cat":"SPECIALTY CHEESE","sub":"SPECIALTY CHEESE SOFT RIPENED","dept":"DELI"},"264007000009":{"brand":"Caves of Faribault","desc":"CAVES ST PETES SELECT BLUE","mda":"MN Grown","note":"","cat":"SPECIALTY CHEESE","sub":"SPECIALTY CHEESE BLUE","dept":"DELI"},"823958750557":{"brand":"Caves of Faribault","desc":"AMABLU BLUE CRUMBLES","mda":"MN Grown","note":"","cat":"SPECIALTY CHEESE","sub":"SPECIALTY CHEESE BLUE","dept":"DELI"},"24284222118":{"brand":"Sno Pac","desc":"SNO PAC ORG BLUEBERRIES","mda":"MN Grown","note":"","cat":"FROZEN FRUITS","sub":"BLUEBERRIES","dept":"FROZEN FOOD"},"24284538141":{"brand":"Sno Pac","desc":"SNO PAC ORG CRANBERRIES","mda":"MN Grown","note":"","cat":"FROZEN FRUITS","sub":"BLUEBERRIES","dept":"FROZEN FOOD"},"24284881964":{"brand":"Sno Pac","desc":"SNO PAC ORG RED RASPBERRIES","mda":"MN Grown","note":"","cat":"FROZEN FRUITS","sub":"RASPBERRIES","dept":"FROZEN FOOD"},"20000273358":{"brand":"Green Giant","desc":"GG STEAM NIBLETS CORN","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"190569522218":{"brand":"Green Giant","desc":"GG STEAM SC CORN BUTTER","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"190569522294":{"brand":"Green Giant","desc":"GG STEAM SWEET PEAS","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"190569522201":{"brand":"Green Giant","desc":"GG STEAM CHOPPED SPINACH","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"190569529200":{"brand":"Green Giant","desc":"GG RESTAURANT HONEY CARROTS","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"20000273389":{"brand":"Green Giant","desc":"GG STEAM SWEET PEAS","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"190569522232":{"brand":"Green Giant","desc":"GG STEAM SC HONEY CARROTS","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"20000128641":{"brand":"Green Giant","desc":"GG EXTRA SWEET CORN ON THE COB","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"20000273327":{"brand":"Green Giant","desc":"GG STEAM BROCCOLI CUTS","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"190569123125":{"brand":"Green Giant","desc":"GG RICED CAULIFLOWER MEDLEY","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"24284394112":{"brand":"Sno Pac","desc":"SNO PAC ORG MIXED VEGETABLES","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"24284297109":{"brand":"Sno Pac","desc":"SNO PAC ORG BUTTERNUT SQUASH","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"24284000266":{"brand":"Sno Pac","desc":"SNO PAC ORG TRI COLOR PEPPERS","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"24284651116":{"brand":"Sno Pac","desc":"SNO PAC ORG PEAS","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"24284354116":{"brand":"Sno Pac","desc":"SNO PAC ORG CORN","mda":"MN Grown","note":"","cat":"FROZEN VEGETABLES","sub":"FROZEN VEGETABLES","dept":"FROZEN FOOD"},"41483044495":{"brand":"Kemps","desc":"KEMPS LF COOKIE DOUGH YOGURT","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"FROZEN YOGURTS","dept":"FROZEN FOOD"},"41483037879":{"brand":"Kemps","desc":"KEMPS LF COOKIES & CRM YOGURT","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"FROZEN YOGURTS","dept":"FROZEN FOOD"},"41483038425":{"brand":"Kemps","desc":"KEMPS LF NEAPOLITAN YOGURT","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"FROZEN YOGURTS","dept":"FROZEN FOOD"},"41483017390":{"brand":"Kemps","desc":"KEMPS FF CHOCOLATE YOGURT","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"FROZEN YOGURTS","dept":"FROZEN FOOD"},"41483037701":{"brand":"Kemps","desc":"KEMPS LF CHOCOLATE YOGURT","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"FROZEN YOGURTS","dept":"FROZEN FOOD"},"41483029027":{"brand":"Kemps","desc":"KEMPS LF STRAWBERRY YOGURT","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"FROZEN YOGURTS","dept":"FROZEN FOOD"},"41483041845":{"brand":"Kemps","desc":"KEMPS LF TWISTED DOUGH YOGURT","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"FROZEN YOGURTS","dept":"FROZEN FOOD"},"41483045034":{"brand":"Kemps","desc":"KEMPS LF YOG APPLE CRISP","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"FROZEN YOGURTS","dept":"FROZEN FOOD"},"41483028235":{"brand":"Kemps","desc":"KEMPS BUTTER PECAN","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483029263":{"brand":"Kemps","desc":"KEMPS VANILLA CUSTARD","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042750":{"brand":"Kemps","desc":"KEMPS SIMPLY VANILLA BN","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028167":{"brand":"Kemps","desc":"KEMPS FRENCH VANILLA SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028136":{"brand":"Kemps","desc":"KEMPS VANILLA SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483044532":{"brand":"Kemps","desc":"KEMPS MU PB COOKIES & CREAM","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038951":{"brand":"Kemps","desc":"KEMPS NS STRAWBERRY","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042804":{"brand":"Kemps","desc":"KEMPS SIMPLY CKIE N CRM","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483032072":{"brand":"Kemps","desc":"KEMPS CHOC CHIP COOKIE DOUGH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038388":{"brand":"Kemps","desc":"KEMPS MALT CUPS CHOCOLATE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042866":{"brand":"Kemps","desc":"KEMPS SIMPLY MINT CHOCO","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483029829":{"brand":"Kemps","desc":"KEMPS CARAMEL FUDGE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483043160":{"brand":"Kemps","desc":"KEMPS SIMPLY SLTD CRML BROWNIE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038166":{"brand":"Kemps","desc":"KEMPS MINT CHOCOLATE CHIP","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038937":{"brand":"Kemps","desc":"KEMPS NS BUTTER PECAN","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038913":{"brand":"Kemps","desc":"KEMPS NS VANILLA","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042873":{"brand":"Kemps","desc":"KEMPS SIMPLY RASP CHEESECAKE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038104":{"brand":"Kemps","desc":"KEMPS CHOCOLATE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038258":{"brand":"Kemps","desc":"KEMPS NEAPOLITAN","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483030962":{"brand":"Kemps","desc":"KEMPS DBL FUDGE MOOSE TRACKS","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042767":{"brand":"Kemps","desc":"KEMPS SIMPLY CHOCOLATE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038180":{"brand":"Kemps","desc":"KEMPS CHOCOLATE CHIP","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483044501":{"brand":"Kemps","desc":"KEMPS MU BRWN & COOKIE SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038210":{"brand":"Kemps","desc":"KEMPS NEW YORK VANILLA","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483040169":{"brand":"Kemps","desc":"KEMPS DBL CARAMEL COOKIE CRNCH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028181":{"brand":"Kemps","desc":"KEMPS PEPPERMINT BON BON","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483033130":{"brand":"Kemps","desc":"KEMPS CANDY CANE SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028228":{"brand":"Kemps","desc":"KEMPS STRAWBERRY & CREAM","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483033567":{"brand":"Kemps","desc":"CARIBOU JAVA CHUNK ICE CREAM","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028211":{"brand":"Kemps","desc":"KEMPS TOASTED ALMOND FUDGE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483033604":{"brand":"Kemps","desc":"KEMPS PECAN TURTLE TRAIL","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038593":{"brand":"Kemps","desc":"KEMPS CHOCOLATE PB CUP","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483045508":{"brand":"Kemps","desc":"KEMPS CRAFTED LEMON BAR","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038005":{"brand":"Kemps","desc":"KEMPS SCROUND CINNAMON","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028143":{"brand":"Kemps","desc":"KEMPS NEW YORK VANILLA","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042798":{"brand":"Kemps","desc":"KEMPS SIMPLY STRAWBERRY","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042859":{"brand":"Kemps","desc":"KEMPS SIMPLY SLTY CARMEL SWIRL","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042774":{"brand":"Kemps","desc":"KEMPS SIMPLY MUDSLIDE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483033598":{"brand":"Kemps","desc":"KEMPS UNDER THE STARS","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483044525":{"brand":"Kemps","desc":"KEMPS MU PB & BROWNIE SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483037619":{"brand":"Kemps","desc":"KEMPS NEAPOLITAN","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028174":{"brand":"Kemps","desc":"KEMPS HOMEADE VANILLA SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042835":{"brand":"Kemps","desc":"KEMPS SIMPLY BUTTER PECN","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038142":{"brand":"Kemps","desc":"KEMPS COOKIE & CREAM","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038029":{"brand":"Kemps","desc":"KEMPS SCROUND PUMPKIN PIE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483044914":{"brand":"Kemps","desc":"KEMPS SIMPLY CARAMEL COLD BREW","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042880":{"brand":"Kemps","desc":"KEMPS SIMPLY DBLE DOUGH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042897":{"brand":"Kemps","desc":"KEMPS SIMPLY COBBLER","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483038197":{"brand":"Kemps","desc":"KEMPS VANILLA","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483033581":{"brand":"Kemps","desc":"KEMPS BEAR CREEK CARAMEL","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042781":{"brand":"Kemps","desc":"KEMPS SIMPLY CHOCO PB","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028204":{"brand":"Kemps","desc":"KEMPS COOKIES & CREAM SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028242":{"brand":"Kemps","desc":"KEMPS MAPLE NUT SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483044464":{"brand":"Kemps","desc":"KEMPS CRM BRWN MOOSE SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042743":{"brand":"Kemps","desc":"KEMPS SIMPLY VANILLA","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483035714":{"brand":"Kemps","desc":"KEMPS CHOCOLATE SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483044471":{"brand":"Kemps","desc":"KEMPS CKIE DOUGH MOOSE SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483030740":{"brand":"Kemps","desc":"KEMPS MINT COW TRACKS","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483040152":{"brand":"Kemps","desc":"KEMPS VANILLA CARAMEL CRUNCH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028198":{"brand":"Kemps","desc":"KEMPS CHOC CHIPS SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028150":{"brand":"Kemps","desc":"KEMPS NATURAL VANILLA SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028341":{"brand":"Kemps","desc":"KEMPS CHERRY FUDGE CHUNK","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483029843":{"brand":"Kemps","desc":"KEMPS CARAMEL COW TRACKS","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483042811":{"brand":"Kemps","desc":"KEMPS SIMPLY COOKIE DGH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483028273":{"brand":"Kemps","desc":"KEMPS MOOSE TRACKS SCROUND","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"72431013461":{"brand":"Lunds & Byerlys","desc":"L&B ICE CREAM CHOCOLATE SS","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"72431013508":{"brand":"Lunds & Byerlys","desc":"L&B ICE CREAM TRIPLE COOKIE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"72431019241":{"brand":"Lunds & Byerlys","desc":"L&B SORBET MANGO","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"72431018954":{"brand":"Lunds & Byerlys","desc":"L&B GELATO CHOC FUDGE BROWNIE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"72431013515":{"brand":"Lunds & Byerlys","desc":"L&B ICE CREAM BROWN BUTTER PEC","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"72431018992":{"brand":"Lunds & Byerlys","desc":"L&B SORBET LEMON","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"72431018961":{"brand":"Lunds & Byerlys","desc":"L&B GELATO COLD BREW COFFEE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"ICE CREAM","dept":"FROZEN FOOD"},"41483023728":{"brand":"Kemps","desc":"KEMPS MINT CHOC CHIP SANDWICH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483043016":{"brand":"Kemps","desc":"KEMPS POPS JUNIORS","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483045492":{"brand":"Kemps","desc":"KEMPS CORES SNICKERDOODLE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483045478":{"brand":"Kemps","desc":"KEMPS PEPPERMINT SANDWICH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483003089":{"brand":"Kemps","desc":"KEMPS ICE CREAM SANDWICH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483043023":{"brand":"Kemps","desc":"KEMPS ALL AMERICAN POPS","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483040749":{"brand":"Kemps","desc":"KEMPS COOKIE DOUGH SANDWICH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483030917":{"brand":"Kemps","desc":"KEMPS CHOC CHIP SANDWICH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483040305":{"brand":"Kemps","desc":"KEMPS LIMITED EDITION SANDWICH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483043405":{"brand":"Kemps","desc":"KEMPS TROPICAL POPS JUNIORS","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483002815":{"brand":"Kemps","desc":"KEMPS ICE CREAM SANDWICH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483045485":{"brand":"Kemps","desc":"KEMPS CORES CHOCOLATE FUDGE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483045584":{"brand":"Kemps","desc":"KEMPS BARS FUDGE","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483020192":{"brand":"Kemps","desc":"KEMPS KEMPSWICH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483030672":{"brand":"Kemps","desc":"KEMPS NSA VANILLA SANDWICH","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483040244":{"brand":"Kemps","desc":"KEMPS BARS VANILLA","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483043030":{"brand":"Kemps","desc":"KEMPS SUGAR FREE POP JUNIORS","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483040275":{"brand":"Kemps","desc":"KEMPS BARS ORANGE CREAM","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"NOVELTIES","dept":"FROZEN FOOD"},"41483044952":{"brand":"Kemps","desc":"KEMPS RD SHERBET STRW LEMON","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"SHERBERT","dept":"FROZEN FOOD"},"41483003270":{"brand":"Kemps","desc":"KEMPS RASPBERRY SHERBET","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"SHERBERT","dept":"FROZEN FOOD"},"41483044013":{"brand":"Kemps","desc":"KEMPS MANGO SHERBET","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"SHERBERT","dept":"FROZEN FOOD"},"41483003256":{"brand":"Kemps","desc":"KEMPS ORANGE SHERBET","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"SHERBERT","dept":"FROZEN FOOD"},"41483044037":{"brand":"Kemps","desc":"KEMPS RASPBERRY LEMONADE SHRBT","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"SHERBERT","dept":"FROZEN FOOD"},"41483003294":{"brand":"Kemps","desc":"KEMPS RASPBERRY SHERBET","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"SHERBERT","dept":"FROZEN FOOD"},"41483045164":{"brand":"Kemps","desc":"KEMPS SHERBET ORANGE DREAM","mda":"MN Grown","note":"Flagged as Local","cat":"ICE CREAM/NOVELTIES","sub":"SHERBERT","dept":"FROZEN FOOD"},"79054000335":{"brand":"Sturdiwheat","desc":"STURDIWHEAT APPLE CRISP MIX","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING MIXES","sub":"BAKING MIXES OTHER","dept":"GROCERY"},"79054001080":{"brand":"Sturdiwheat","desc":"STURDIWHEAT WILD RICE BREAD MX","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING MIXES","sub":"BREAD MIXES","dept":"GROCERY"},"79054000090":{"brand":"Sturdiwheat","desc":"STURDIWHEAT GARLIC BREAD MIX","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING MIXES","sub":"BREAD MIXES","dept":"GROCERY"},"79054000120":{"brand":"Sturdiwheat","desc":"STURDIWHEAT WHITE BREAD MIX","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING MIXES","sub":"BREAD MIXES","dept":"GROCERY"},"855968006102":{"brand":"Mama Stoen's","desc":"MAMA STOEN GF ANGEL FOOD MIX","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING MIXES","sub":"CAKE MIXES","dept":"GROCERY"},"855968006003":{"brand":"Mama Stoen's","desc":"MAMA STOEN GF CHOC CAKE MIX","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING MIXES","sub":"CAKE MIXES","dept":"GROCERY"},"855968006027":{"brand":"Mama Stoen's","desc":"MAMA STOEN GF CARROT CAKE MIX","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING MIXES","sub":"CAKE MIXES","dept":"GROCERY"},"72431008139":{"brand":"Lunds & Byerlys","desc":"L&B SWEDISH PANCAKE MIX","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING MIXES","sub":"PANCAKE/WAFFLE MIX","dept":"GROCERY"},"72431008153":{"brand":"Lunds & Byerlys","desc":"L&B MINNESOTA PANCAKE MIX","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING MIXES","sub":"PANCAKE/WAFFLE MIX","dept":"GROCERY"},"79054000021":{"brand":"Sturdiwheat","desc":"STURDIWHEAT PANCAKE MIX","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING MIXES","sub":"PANCAKE/WAFFLE MIX","dept":"GROCERY"},"79054000212":{"brand":"Sturdiwheat","desc":"STURDIWHEAT BUCKWHEAT PANCAKE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING MIXES","sub":"PANCAKE/WAFFLE MIX","dept":"GROCERY"},"77449405000":{"brand":"Gurley's","desc":"GURLEY RAW COCONUT","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING NEEDS","sub":"BAKING ADDITIVES/INGREDIENTS","dept":"GROCERY"},"77449405161":{"brand":"Gurley's","desc":"GURLEY CHOCOLATE ALMOND BARK","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING NEEDS","sub":"BAKING CHOCOLATE & PIECES","dept":"GROCERY"},"77449300077":{"brand":"Gurley's","desc":"GURLEY FILBERTS","mda":"Made in Minnesota","note":"Not flagged as local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"72431601309":{"brand":"Lunds & Byerlys","desc":"L&B BAKING SLICED ALMONDS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"72431601415":{"brand":"Lunds & Byerlys","desc":"L&B BAKING CHOPPED PECANS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"72431601477":{"brand":"Lunds & Byerlys","desc":"L&B BAKING WALNUT HALVES","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"72431017469":{"brand":"Lunds & Byerlys","desc":"L&B PINE NUTS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"72431601392":{"brand":"Lunds & Byerlys","desc":"L&B BAKING PECAN HALVES","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"72431005961":{"brand":"Lunds & Byerlys","desc":"L&B BLANCHED SLICED ALMONDS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"72431011153":{"brand":"Lunds & Byerlys","desc":"L&B BAKING MACADAMIA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"72431601330":{"brand":"Lunds & Byerlys","desc":"L&B BAKING WALNUT HALVES","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"72431601439":{"brand":"Lunds & Byerlys","desc":"L&B BAKING CHOPPED WALNUTS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"72431019692":{"brand":"Lunds & Byerlys","desc":"L&B ORG BAKING DATES","mda":"Made in Minnesota","note":"Flagged as Local","cat":"BAKING NEEDS","sub":"BAKING NUTS","dept":"GROCERY"},"77290128110":{"brand":"Pearson's","desc":"PEARSON NUT GOODIES BOX","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CANDY","sub":"CHECKSTAND","dept":"GROCERY"},"77290908118":{"brand":"Pearson's","desc":"PEARSON NUT GOODIE CLUSTERS","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CANDY","sub":"CHECKSTAND","dept":"GROCERY"},"77290918209":{"brand":"Pearson's","desc":"PEARSON NUT ROLL","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CANDY","sub":"CHECKSTAND","dept":"GROCERY"},"77290813702":{"brand":"Pearson's","desc":"PEARSON NUT ROLL SKIPPY PB","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CANDY","sub":"CHECKSTAND","dept":"GROCERY"},"77290907722":{"brand":"Pearson's","desc":"PEARSON MINT PATTIES","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CANDY","sub":"SHELF CHOCOLATE","dept":"GROCERY"},"77290922121":{"brand":"Pearson's","desc":"PEARSON NUT GOODIE BITE SIZE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CANDY","sub":"SHELF CHOCOLATE","dept":"GROCERY"},"22224213004":{"brand":"Wiley Wallaby","desc":"WILEY WALLABY RED LICORICE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SHELF NON CHOC","dept":"GROCERY"},"22224211925":{"brand":"Wiley Wallaby","desc":"WILEY WALLABY HOT CINNAMON","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SHELF NON CHOC","dept":"GROCERY"},"22224211161":{"brand":"Wiley Wallaby","desc":"WILEY WALLABY BB POM LICORICE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SHELF NON CHOC","dept":"GROCERY"},"22224213035":{"brand":"Wiley Wallaby","desc":"WILEY WALLABY BERRY LICORICE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SHELF NON CHOC","dept":"GROCERY"},"22224211239":{"brand":"Wiley Wallaby","desc":"WILEY WALLABY ALL SORTS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SHELF NON CHOC","dept":"GROCERY"},"22224211246":{"brand":"Wiley Wallaby","desc":"WILEY WALLABY LEMONADE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SHELF NON CHOC","dept":"GROCERY"},"766684006782":{"brand":"Abdallah","desc":"ABDALLAH LICORICE CARAMELS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684013018":{"brand":"Abdallah","desc":"ABDALLAH SF ASST CHOC","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684902688":{"brand":"Abdallah","desc":"ABDALLAH RETREATS DARK CHOC","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684004504":{"brand":"Abdallah","desc":"ABDALLAH CHOC ANGEL MINTS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684001800":{"brand":"Abdallah","desc":"ABDALLAH MILK CHOC ALLIGATORS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684002319":{"brand":"Abdallah","desc":"ABDALLAH 2 TIER VANILLA TOWER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684006799":{"brand":"Abdallah","desc":"ABDALLAH CINN CHURRO TOFFEE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684002258":{"brand":"Abdallah","desc":"ABDALLAH EXCUSIVE CHOC SELECT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684003453":{"brand":"Abdallah","desc":"ABDALLAH DOWNTOWNER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684006836":{"brand":"Abdallah","desc":"ABDALLAH CASHEW BUTTER TOFFEE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684007604":{"brand":"Abdallah","desc":"ABDALLAH BOURBON CARAMELS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684007253":{"brand":"Abdallah","desc":"ABDALLAH DARK CHOC PRETZELS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684007437":{"brand":"Abdallah","desc":"ABDALLAH DAISIES MILK CHOC","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684008359":{"brand":"Abdallah","desc":"ABDALLAH WILD CHERRY DROPS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684007376":{"brand":"Abdallah","desc":"ABDALLAH CHOC SS CARAMEL","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684007918":{"brand":"Abdallah","desc":"ABDALLAH DARK CHOCOLATE DROPS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684902718":{"brand":"Abdallah","desc":"ABDALLAH RETREATS LIME SORBET","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684007383":{"brand":"Abdallah","desc":"ABDALLAH BRBN CARAMEL TWST WRP","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684902732":{"brand":"Abdallah","desc":"ABDALLAH RETREATS CASHEW TOFFE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684007208":{"brand":"Abdallah","desc":"ABDALLAH WHITE PRETZELS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY CANDY","dept":"GROCERY"},"766684006997":{"brand":"Abdallah","desc":"ABDALLAH DARK CHOC SPONGES","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684002906":{"brand":"Abdallah","desc":"ABDALLAH DOWNTOWNER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684007789":{"brand":"Abdallah","desc":"ABDALLAH DARK CHOC CROQ","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684006805":{"brand":"Abdallah","desc":"ABDALLAH ALPINE BUTTER TOFFEE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684009004":{"brand":"Abdallah","desc":"ABDALLAH GREEN ANGEL MINT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684902510":{"brand":"Abdallah","desc":"ABDALLAH GREET BOX LOVE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684902503":{"brand":"Abdallah","desc":"ABDALLAH GREET BOX HAPPY BDAY","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684009998":{"brand":"Abdallah","desc":"ABDALLAH CARAMEL S'MORES","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684000100":{"brand":"Abdallah","desc":"ABDALLAH DOWNTOWNER CHOC","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684008502":{"brand":"Abdallah","desc":"ABDALLAH CHERRY BALLS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684008304":{"brand":"Abdallah","desc":"ABDALLAH ROYAL ALMONDS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684007109":{"brand":"Abdallah","desc":"ABDALLAH BUTTERSCOTCH BUTTONS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684004108":{"brand":"Abdallah","desc":"ABDALLAH NUT CLUSTER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684002937":{"brand":"Abdallah","desc":"ABDALLAH MINI MINTS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"766684902480":{"brand":"Abdallah","desc":"ABDALLAH GREET BOX CELEBRATE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"72431009860":{"brand":"Lunds & Byerlys","desc":"L&B CB CHOC SEA SALT CARAMELS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"72431004803":{"brand":"Lunds & Byerlys","desc":"L&B BOX M VICTORIAN BRITTLE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"72431008689":{"brand":"Lunds & Byerlys","desc":"L&B CB CHOC CASHEW GRIZZLY","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"72431010569":{"brand":"Lunds & Byerlys","desc":"L&B BOX M NUT CLUSTER & CARAML","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"72431008658":{"brand":"Lunds & Byerlys","desc":"L&B CB MILK CHOC STARS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"71502997228":{"brand":"Lunds & Byerlys","desc":"50TH ST EVENT BOXED CANDY","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"72431010576":{"brand":"Lunds & Byerlys","desc":"L&B BOX L NUT CLUSTER & CARAML","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"72431012860":{"brand":"Lunds & Byerlys","desc":"L&B DARK CHOC STRAW LICORICE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"72431004667":{"brand":"Lunds & Byerlys","desc":"L&B S SS ALMOND CARAMELS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"72431005121":{"brand":"Lunds & Byerlys","desc":"L&B PB MILK CHOC GRAHAM","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SPECIALTY GIFT BOX/NOVELTY","dept":"GROCERY"},"819893038577":{"brand":"Maud Borup","desc":"MAUD B CAKE CTTN CNDY TUB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SUMMER CANDY","dept":"GROCERY"},"819893039116":{"brand":"Maud Borup","desc":"MAUD B LEMONADE SUP CTTN CNDY","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SUMMER CANDY","dept":"GROCERY"},"819893039123":{"brand":"Maud Borup","desc":"MAUD B PICKLE CTTN CNDY TUB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SUMMER CANDY","dept":"GROCERY"},"819893030328":{"brand":"Maud Borup","desc":"MAUD B MAGIC DRAGON CC TUB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CANDY","sub":"SUMMER CANDY","dept":"GROCERY"},"860005141913":{"brand":"Lovebird","desc":"LOVEBIRD GF CEREAL HONEY O'S","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CEREAL","sub":"SPECIALTY CEREAL","dept":"GROCERY"},"860005141999":{"brand":"Lovebird","desc":"LOVEBIRD GF CEREAL STRAW O'S","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CEREAL","sub":"SPECIALTY CEREAL","dept":"GROCERY"},"860005141920":{"brand":"Lovebird","desc":"LOVEBIRD GF CEREAL CINN O'S","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CEREAL","sub":"SPECIALTY CEREAL","dept":"GROCERY"},"856088003675":{"brand":"Seven Sundays","desc":"7 SUNDAYS MUESLI FARMERS MARK","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CEREAL","sub":"SPECIALTY CEREAL","dept":"GROCERY"},"856088003750":{"brand":"Seven Sundays","desc":"7 SUNDAYS SUNFLOWER REAL COCOA","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CEREAL","sub":"SPECIALTY CEREAL","dept":"GROCERY"},"72431012709":{"brand":"Lunds & Byerlys","desc":"L&B SCANDINAVIAN BLEND GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"72431009754":{"brand":"Lunds & Byerlys","desc":"L&B HAZELNUT CREAM GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"72431012280":{"brand":"Lunds & Byerlys","desc":"L&B ORG SUNRISE BLEND GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"72431012532":{"brand":"Lunds & Byerlys","desc":"L&B BREAKFAST BLEND WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"72431012426":{"brand":"Lunds & Byerlys","desc":"L&B ORG DECAF SUNRISE BLND WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000299":{"brand":"Peace Coffee","desc":"PEACE BLK SQUIRREL ESPRESSO GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000749":{"brand":"Peace Coffee","desc":"PEACE POLLINATOR BLEND WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000589":{"brand":"Peace Coffee","desc":"PEACE TWIN CITIES WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000640":{"brand":"Peace Coffee","desc":"PEACE MORNING GLORY WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000787":{"brand":"Peace Coffee","desc":"PEACE ETHIOPIA GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"853523008660":{"brand":"Peace Coffee","desc":"PEACE FRENCH ROAST GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000329":{"brand":"Peace Coffee","desc":"PEACE TREE HUGGER GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"853523008639":{"brand":"Peace Coffee","desc":"PEACE GUATEMALAN DARK WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000701":{"brand":"Peace Coffee","desc":"PEACE PERUVIAN WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"853523008523":{"brand":"Peace Coffee","desc":"PEACE BIRCHWOOD WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000800":{"brand":"Peace Coffee","desc":"PEACE DECAF MORNING GLORY GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000596":{"brand":"Peace Coffee","desc":"PEACE TWIN CITIES GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"853523008707":{"brand":"Peace Coffee","desc":"PEACE MORNING GLORY GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"853523008691":{"brand":"Peace Coffee","desc":"PEACE MORNING GLORY WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000527":{"brand":"Peace Coffee","desc":"PEACE GUATEMALAN DARK WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000756":{"brand":"Peace Coffee","desc":"PEACE POLLINATOR BLEND GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000718":{"brand":"Peace Coffee","desc":"PEACE YETI COLD BREW GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000442":{"brand":"Peace Coffee","desc":"PEACE DECAF FRENCH ROAST WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"853523008745":{"brand":"Peace Coffee","desc":"PEACE COLOMBIA GR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"895431000374":{"brand":"Peace Coffee","desc":"PEACE BIRCHWOOD WB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"864622000165":{"brand":"Spyhouse","desc":"SPYHOUSE BOLD & BEAUTIFUL","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"864622000172":{"brand":"Spyhouse","desc":"SPYHOUSE PERU","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"GROUND & WHOLE BEAN PACKAGED","dept":"GROCERY"},"72431009778":{"brand":"Lunds & Byerlys","desc":"L&B HAZELNUT CREAM SINGLES","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"K-CUP","dept":"GROCERY"},"72431009716":{"brand":"Lunds & Byerlys","desc":"L&B SEA SALT CARAMEL SINGLES","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"K-CUP","dept":"GROCERY"},"72431013041":{"brand":"Lunds & Byerlys","desc":"L&B BREAKFAST BLEND SINGLES","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"K-CUP","dept":"GROCERY"},"72431013089":{"brand":"Lunds & Byerlys","desc":"L&B SCANDINAVIAN BLEND SINGLES","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"K-CUP","dept":"GROCERY"},"853523008936":{"brand":"Peace Coffee","desc":"PEACE COFFEE POD BIRCHWOOD","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"K-CUP","dept":"GROCERY"},"853523008943":{"brand":"Peace Coffee","desc":"PEACE COFFEE POD TREE HUGGER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"COFFEE","sub":"K-CUP","dept":"GROCERY"},"72431010521":{"brand":"Lunds & Byerlys","desc":"L&B CAROLINA GOLD BBQ SAUCE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"72431009945":{"brand":"Lunds & Byerlys","desc":"L&B HONEY GINGER TERIYAKI SCE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"72431009365":{"brand":"Lunds & Byerlys","desc":"L&B MAPLE ROSEMARY GRILL SC","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"72431737374":{"brand":"Lunds & Byerlys","desc":"L&B TWIN CITIES GRILL SAUCE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"72431010538":{"brand":"Lunds & Byerlys","desc":"*L&B TANGY SOUTHERN STYLE SAU","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"602938538152":{"brand":"Triple Crown","desc":"TRIPLE CROWN BLACK GARLIC BBQ","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"799665727253":{"brand":"Triple Crown","desc":"TRIPLE CROWN CLASSIC BBQ","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"602938538183":{"brand":"Triple Crown","desc":"TRIPLE CROWN BOURBON BBQ","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"857699000565":{"brand":"Wee Willy's","desc":"WEE WILLYS BBQ HOT FORMULA","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"857699000282":{"brand":"Wee Willy's","desc":"WEE WILLYS BBQ NORTH CAROLINA","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"857699000992":{"brand":"Wee Willy's","desc":"WEE WILLYS BBQ WORLD CHAMPION","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"857699000169":{"brand":"Wee Willy's","desc":"WEE WILLYS BBQ CAROLINA GOLD","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"857699000152":{"brand":"Wee Willy's","desc":"WEE WILLYS BBQ TEXAS PIT","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CONDIMENTS & SAUCES","sub":"BARBECUE SAUCE","dept":"GROCERY"},"72431010965":{"brand":"Lunds & Byerlys","desc":"L&B AU JUS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"MEAT SAUCE & RUBS","dept":"GROCERY"},"72431010996":{"brand":"Lunds & Byerlys","desc":"L&B STEAK & CHOP SEASONING","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"MEAT SAUCE & RUBS","dept":"GROCERY"},"72431010545":{"brand":"Lunds & Byerlys","desc":"L&B WORCESTERSHIRE SAUCE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CONDIMENTS & SAUCES","sub":"MEAT SAUCE & RUBS","dept":"GROCERY"},"72734127155":{"brand":"Canoe","desc":"CANOE WHITE & WILD RICE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"DRIED RICE & GRAINS","sub":"RICE","dept":"GROCERY"},"72734001066":{"brand":"Canoe","desc":"CANOE FRESHLY RSTD WILD RICE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"DRIED RICE & GRAINS","sub":"RICE","dept":"GROCERY"},"72734120170":{"brand":"Canoe","desc":"CANOE COOKED WILD RICE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"DRIED RICE & GRAINS","sub":"RICE","dept":"GROCERY"},"72431009679":{"brand":"Lunds & Byerlys","desc":"L&B CULTIVATED MN WILD RICE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"DRIED RICE & GRAINS","sub":"RICE","dept":"GROCERY"},"72431009693":{"brand":"Lunds & Byerlys","desc":"L&B CANADIAN HARVEST WILD RICE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"DRIED RICE & GRAINS","sub":"RICE","dept":"GROCERY"},"675674928020":{"brand":"La Perla","desc":"LA PERLA FLOUR TORTILLA 8IN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"HISPANIC TORTILLAS","dept":"GROCERY"},"675674926453":{"brand":"La Perla","desc":"LA PERLA WHITE CORN TORT 6IN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"HISPANIC TORTILLAS","dept":"GROCERY"},"850016877024":{"brand":"Double Take Salsa","desc":"DOUBLE TAKE ACES & EIGHTS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"850016877291":{"brand":"Double Take Salsa","desc":"DOUBLE TAKE CHERRY SALSA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"850016877031":{"brand":"Double Take Salsa","desc":"DOUBLE TAKE EL JEFE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"850016877055":{"brand":"Double Take Salsa","desc":"DOUBLE TAKE MACHISMO MEDIUM","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"850016877048":{"brand":"Double Take Salsa","desc":"DOUBLE TAKE MACHISMO SPICY","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"850016877062":{"brand":"Double Take Salsa","desc":"DOUBLE TAKE VERDE GREEN CHILI","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"72431005305":{"brand":"Lunds & Byerlys","desc":"L&B SCORPION PEPPER SALSA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"72431029400":{"brand":"Lunds & Byerlys","desc":"L&B GARLIC & ONION SALSA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"72431005237":{"brand":"Lunds & Byerlys","desc":"L&B SWEET PEACH SALSA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"72431029417":{"brand":"Lunds & Byerlys","desc":"L&B MEDIUM SALSA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"857699000671":{"brand":"Wee Willy's","desc":"WEE WILLYS SALSA MED CHUNKY","mda":"Made in Minnesota","note":"Not flagged as local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"857699000657":{"brand":"Wee Willy's","desc":"WEE WILLYS SALSA PINEAPPLE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"857699000664":{"brand":"Wee Willy's","desc":"WEE WILLYS SALSA HOT CHUNKY","mda":"Made in Minnesota","note":"Not flagged as local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"857699000688":{"brand":"Wee Willy's","desc":"WEE WILLYS SALSA MILD CHUNKY","mda":"Made in Minnesota","note":"Not flagged as local","cat":"HISPANIC","sub":"SALSA","dept":"GROCERY"},"72431004469":{"brand":"Lunds & Byerlys","desc":"L&B CHERRY BUTTER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"JAMS, JELLIES, SPREADS","sub":"SPECIALTY SPREADS","dept":"GROCERY"},"72431016998":{"brand":"Lunds & Byerlys","desc":"L&B LEMON CURD","mda":"Made in Minnesota","note":"Flagged as Local","cat":"JAMS, JELLIES, SPREADS","sub":"SPECIALTY SPREADS","dept":"GROCERY"},"72431018923":{"brand":"Lunds & Byerlys","desc":"L&B PINEAPPLE JALAPENO JELLY","mda":"Made in Minnesota","note":"Flagged as Local","cat":"JAMS, JELLIES, SPREADS","sub":"SPECIALTY SPREADS","dept":"GROCERY"},"25569141988":{"brand":"Summit Brewing Company","desc":"SUMMIT NIALAS NA IRISH","mda":"Made in Minnesota","note":"Flagged as Local","cat":"NON-ALCOHOLIC ADULT BEVERAGES","sub":"NON-ALCOHOLIC BEER","dept":"GROCERY"},"25569149229":{"brand":"Summit Brewing Company","desc":"SUMMIT NIALAS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"NON-ALCOHOLIC ADULT BEVERAGES","sub":"NON-ALCOHOLIC BEER","dept":"GROCERY"},"810005491778":{"brand":"Surly","desc":"SURLY OUTLOOK GOOD NA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"NON-ALCOHOLIC ADULT BEVERAGES","sub":"NON-ALCOHOLIC BEER","dept":"GROCERY"},"810005491426":{"brand":"Surly","desc":"SURLY HOP WATER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"NON-ALCOHOLIC ADULT BEVERAGES","sub":"NON-ALCOHOLIC BEER","dept":"GROCERY"},"72431600074":{"brand":"Lunds & Byerlys","desc":"L&B TOMATO BASIL PASTA SAUCE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"PASTA SAUCE","sub":"SUPER PREMIUM","dept":"GROCERY"},"72431600081":{"brand":"Lunds & Byerlys","desc":"L&B ARRABBIATA PASTA SAUCE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"PASTA SAUCE","sub":"SUPER PREMIUM","dept":"GROCERY"},"857699000800":{"brand":"Wee Willy's","desc":"WEE WILLYS SAUCE FAMILY RECIPE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"PASTA SAUCE","sub":"SUPER PREMIUM","dept":"GROCERY"},"857699000794":{"brand":"Wee Willy's","desc":"WEE WILLYS SAUCE CREAMY TOMATO","mda":"Made in Minnesota","note":"Not flagged as local","cat":"PASTA SAUCE","sub":"SUPER PREMIUM","dept":"GROCERY"},"72431009853":{"brand":"Lunds & Byerlys","desc":"L&B PURE PEPPERMINT EXTRACT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"EXTRACTS-FOOD COLOR","dept":"GROCERY"},"72431009839":{"brand":"Lunds & Byerlys","desc":"L&B ORG PURE VANILLA EXTRACT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"EXTRACTS-FOOD COLOR","dept":"GROCERY"},"813724023756":{"brand":"Watkins","desc":"WATKINS ALL NAT BAKING VANILLA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"EXTRACTS-FOOD COLOR","dept":"GROCERY"},"818570005055":{"brand":"Watkins","desc":"WATKINS MADAGASCAR VAN EXTRACT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"EXTRACTS-FOOD COLOR","dept":"GROCERY"},"818570005536":{"brand":"Watkins","desc":"WATKINS COCONUT EXTRACT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"EXTRACTS-FOOD COLOR","dept":"GROCERY"},"818570008964":{"brand":"Watkins","desc":"WATKINS PURE MINT EXTRACT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"EXTRACTS-FOOD COLOR","dept":"GROCERY"},"813724023473":{"brand":"Watkins","desc":"WATKINS ALL NAT VANILLA EXTRAC","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"EXTRACTS-FOOD COLOR","dept":"GROCERY"},"813724021622":{"brand":"Watkins","desc":"WATKINS NAT FOOD COLORING","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"EXTRACTS-FOOD COLOR","dept":"GROCERY"},"72431007309":{"brand":"Lunds & Byerlys","desc":"L&B ADOBO SEASONING","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SEASONING-RUBS","dept":"GROCERY"},"72431000928":{"brand":"Lunds & Byerlys","desc":"L&B SRIRACHA SEASONING","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SEASONING-RUBS","dept":"GROCERY"},"813724023817":{"brand":"Watkins","desc":"WATKINS ORG SEAFOOD/POULTRY","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SEASONING-RUBS","dept":"GROCERY"},"72431000799":{"brand":"Lunds & Byerlys","desc":"*L&B FISH BY THE BAY","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"72431006586":{"brand":"Lunds & Byerlys","desc":"L&B BEEF DRY AGED XL","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"72431000225":{"brand":"Lunds & Byerlys","desc":"L&B CUMIN WHOLE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"72431000379":{"brand":"Lunds & Byerlys","desc":"L&B BASIL ORGANIC","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"72431002847":{"brand":"Lunds & Byerlys","desc":"L&B TURMERIC","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"72431000416":{"brand":"Lunds & Byerlys","desc":"L&B GROUND ORGANIC CUMIN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"72431002359":{"brand":"Lunds & Byerlys","desc":"*L&B POTATO SPUD SIGNATURE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"72431018411":{"brand":"Lunds & Byerlys","desc":"L&B ZA'ATAR SEASONING","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"72431003998":{"brand":"Lunds & Byerlys","desc":"L&B CURRY MADRAS SEASONING","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"72431002403":{"brand":"Lunds & Byerlys","desc":"L&B BASIL SWEET MEDITERRANEAN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"813724026573":{"brand":"Watkins","desc":"WATKINS 1868 GARLIC & HERB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"813724027914":{"brand":"Watkins","desc":"WATKINS 1868 NSA GARLIC & HERB","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"813724026559":{"brand":"Watkins","desc":"WATKINS 1868 CHICKEN SEASON","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALT, SEASONING, SPICES","sub":"SPICES","dept":"GROCERY"},"851650003022":{"brand":"Drew's","desc":"DREWS STOVE TOP POWER POP","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"POPCORN - UNPOPPED","dept":"GROCERY"},"813724026917":{"brand":"Watkins","desc":"WATKIN POPCORN BUTTER SALT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"POPCORN - UNPOPPED","dept":"GROCERY"},"813724026900":{"brand":"Watkins","desc":"WATKIN POPCORN CHEDDAR SEASNG","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"POPCORN - UNPOPPED","dept":"GROCERY"},"813724026924":{"brand":"Watkins","desc":"WATKIN POPCORN RANCH SEASONING","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"POPCORN - UNPOPPED","dept":"GROCERY"},"72431004391":{"brand":"Lunds & Byerlys","desc":"L&B KETTLE SPICY CHEDDAR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"POTATO CHIPS & PRODUCTS","dept":"GROCERY"},"72431009105":{"brand":"Lunds & Byerlys","desc":"L&B KETTLE SALT & BLACK PEPPER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"POTATO CHIPS & PRODUCTS","dept":"GROCERY"},"72431009006":{"brand":"Lunds & Byerlys","desc":"L&B KETTLE ORIGINAL","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"POTATO CHIPS & PRODUCTS","dept":"GROCERY"},"851650003008":{"brand":"Drew's","desc":"DREWS CARAMEL CORN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"READY-TO-EAT POPCORN","dept":"GROCERY"},"850060092084":{"brand":"Highland Popcorn","desc":"HIGHLAND POPCORN CHEESETASTIC","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"READY-TO-EAT POPCORN","dept":"GROCERY"},"850060092008":{"brand":"Highland Popcorn","desc":"HIGHLAND POPCORN HEY BUTTER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"READY-TO-EAT POPCORN","dept":"GROCERY"},"850060092077":{"brand":"Highland Popcorn","desc":"HIGHLAND POPCORN WOWZA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"READY-TO-EAT POPCORN","dept":"GROCERY"},"77449375303":{"brand":"Gurley's","desc":"GURLEY PEANUTS SALTED IN SHELL","mda":"Made in Minnesota","note":"Not flagged as local","cat":"SALTY SNACKS","sub":"SNACK NUTS","dept":"GROCERY"},"72431014703":{"brand":"Lunds & Byerlys","desc":"L&B COUNTRY TRAIL MIX","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"SNACK NUTS","dept":"GROCERY"},"72431011030":{"brand":"Lunds & Byerlys","desc":"L&B PEANUTS SALT & VINEGAR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"SNACK NUTS","dept":"GROCERY"},"72431018459":{"brand":"Lunds & Byerlys","desc":"L&B YOGURT TRAIL MIX","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"SNACK NUTS","dept":"GROCERY"},"72431020131":{"brand":"Lunds & Byerlys","desc":"L&B DELUXE NUT ASSORTMENT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SALTY SNACKS","sub":"SNACK NUTS","dept":"GROCERY"},"72431011092":{"brand":"Lunds & Byerlys","desc":"L&B AVOCADO OIL","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SHORTENINGS, OIL","sub":"COOKING & SALAD OILS","dept":"GROCERY"},"72431011108":{"brand":"Lunds & Byerlys","desc":"L&B AVOCADO & EVOO BLEND","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SHORTENINGS, OIL","sub":"COOKING & SALAD OILS","dept":"GROCERY"},"857408002248":{"brand":"Smude's","desc":"SMUDE GARLIC PEPPER SF OIL","mda":"Made in Minnesota","note":"Not flagged as local","cat":"SHORTENINGS, OIL","sub":"COOKING & SALAD OILS","dept":"GROCERY"},"857408002286":{"brand":"Smude's","desc":"SMUDE HOT FIERY PEPPER SF OIL","mda":"Made in Minnesota","note":"Not flagged as local","cat":"SHORTENINGS, OIL","sub":"COOKING & SALAD OILS","dept":"GROCERY"},"857408002255":{"brand":"Smude's","desc":"SMUDE MEDITERRANEAN SF OIL","mda":"Made in Minnesota","note":"Not flagged as local","cat":"SHORTENINGS, OIL","sub":"COOKING & SALAD OILS","dept":"GROCERY"},"72431005831":{"brand":"Lunds & Byerlys","desc":"L&B CRANBERRY GINGER MIXER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"COCKTAIL MIXERS","dept":"GROCERY"},"72431005855":{"brand":"Lunds & Byerlys","desc":"L&B HIBISCUS GRAPEFRUIT MIXER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"COCKTAIL MIXERS","dept":"GROCERY"},"71502000584":{"brand":"Lunds & Byerlys","desc":"L&B DILL BLOODY MARY MIXER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"COCKTAIL MIXERS","dept":"GROCERY"},"850007526504":{"brand":"Urban Growler","desc":"URBAN GLOW HRBL CITRUS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"COCKTAIL MIXERS","dept":"GROCERY"},"850007526511":{"brand":"Urban Growler","desc":"URBAN GLOW CRAN APPLE SPRKLRT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"COCKTAIL MIXERS","dept":"GROCERY"},"813724025057":{"brand":"Watkins","desc":"WATKINS ORANGE BITTERS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"COCKTAIL MIXERS","dept":"GROCERY"},"860005493074":{"brand":"Jinx Tea","desc":"JINX TEA TEA RUBY PUNCH","mda":"Made in Minnesota","note":"Not flagged as local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"READY TO DRINK TEA AND COFFEE","dept":"GROCERY"},"860005493098":{"brand":"Jinx Tea","desc":"JINX TEA RASPBERRY LEMONADE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"READY TO DRINK TEA AND COFFEE","dept":"GROCERY"},"72431006241":{"brand":"Lunds & Byerlys","desc":"L&B COLD PRESS MOCHA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"READY TO DRINK TEA AND COFFEE","dept":"GROCERY"},"72431006234":{"brand":"Lunds & Byerlys","desc":"L&B COLD PRESS SALTED CARAMEL","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"READY TO DRINK TEA AND COFFEE","dept":"GROCERY"},"72431006487":{"brand":"Lunds & Byerlys","desc":"L&B MIXED BERRY CAFF SPARKLING","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"SPARKLING WATER","dept":"GROCERY"},"72431006494":{"brand":"Lunds & Byerlys","desc":"L&B LEMON LIME CAFF SPARKLING","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"SPARKLING WATER","dept":"GROCERY"},"685165383221":{"brand":"Lift Bridge Brewing","desc":"LIFT BRIDGE BLACK CHERRY","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"SPECIALTY SOFT DRINKS","dept":"GROCERY"},"685165383252":{"brand":"Lift Bridge Brewing","desc":"LIFT BRIDGE BLACK CHERRY SODA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"SPECIALTY SOFT DRINKS","dept":"GROCERY"},"685165383153":{"brand":"Lift Bridge Brewing","desc":"LIFT BRIDGE MINI DONUT SODA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"SPECIALTY SOFT DRINKS","dept":"GROCERY"},"685165383023":{"brand":"Lift Bridge Brewing","desc":"LIFT BRIDGE ROOT BEER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"SPECIALTY SOFT DRINKS","dept":"GROCERY"},"685165383122":{"brand":"Lift Bridge Brewing","desc":"LIFT BRIDGE MINI DONUT SODA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"SPECIALTY SOFT DRINKS","dept":"GROCERY"},"685165383054":{"brand":"Lift Bridge Brewing","desc":"LIFT BRIDGE ROOT BEER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"SOFT DRINKS/BEVERAGE MIXES","sub":"SPECIALTY SOFT DRINKS","dept":"GROCERY"},"72431050367":{"brand":"Lunds & Byerlys","desc":"L&B HOT ITALIAN SAUSAGE CHUB","mda":"MN Grown","note":"Flagged as Local","cat":"FROZEN PROCESSED MEATS","sub":"FROZEN PORK ORGANIC/NATURAL","dept":"MEAT"},"72431050350":{"brand":"Lunds & Byerlys","desc":"L&B MILD ITALIAN SAUSAGE CHUB","mda":"MN Grown","note":"Flagged as Local","cat":"FROZEN PROCESSED MEATS","sub":"FROZEN PORK ORGANIC/NATURAL","dept":"MEAT"},"72431050947":{"brand":"Lunds & Byerlys","desc":"L&B BACON HICKORY SMOKED THICK","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED BACON","sub":"O/N BACON","dept":"MEAT"},"72431050428":{"brand":"Lunds & Byerlys","desc":"L&B BACON APPLE SMOKED","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED BACON","sub":"O/N BACON","dept":"MEAT"},"72431050404":{"brand":"Lunds & Byerlys","desc":"L&B BACON HICKORY SMOKED","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED BACON","sub":"O/N BACON","dept":"MEAT"},"72431050589":{"brand":"Lunds & Byerlys","desc":"L&B OLD FASH BEEF WIENERSSKIN","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED FRANKS","sub":"FRANKS/HOT DOGS","dept":"MEAT"},"72431050596":{"brand":"Lunds & Byerlys","desc":"L&B OLD FASH CRS WIENERS SKIN","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED FRANKS","sub":"FRANKS/HOT DOGS","dept":"MEAT"},"255095000002":{"brand":"Lunds & Byerlys","desc":"L&B TURKEY ITALIAN SAUSAGE LNK","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"FRESH NATURAL SAUSAGE","dept":"MEAT"},"255099000008":{"brand":"Lunds & Byerlys","desc":"L&B HOT ITALIAN SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"FRESH NATURAL SAUSAGE","dept":"MEAT"},"72431019074":{"brand":"Lunds & Byerlys","desc":"L&B CLASSIC BRATWURST","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"FRESH NATURAL SAUSAGE","dept":"MEAT"},"72431019036":{"brand":"Lunds & Byerlys","desc":"L&B MILD ITALIAN SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"FRESH NATURAL SAUSAGE","dept":"MEAT"},"255101000002":{"brand":"Lunds & Byerlys","desc":"L&B BREAKFAST SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"FRESH NATURAL SAUSAGE","dept":"MEAT"},"255088000002":{"brand":"Lunds & Byerlys","desc":"L&B CLASSIC BRATWURST","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"FRESH NATURAL SAUSAGE","dept":"MEAT"},"72431019159":{"brand":"Lunds & Byerlys","desc":"L&B TURKEY ITAL SAUSAGE LINKS","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"FRESH NATURAL SAUSAGE","dept":"MEAT"},"72431019142":{"brand":"Lunds & Byerlys","desc":"L&B TURKEY ITALIAN SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"FRESH NATURAL SAUSAGE","dept":"MEAT"},"72431019135":{"brand":"Lunds & Byerlys","desc":"L&B TURKEY BRATWURST","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"FRESH NATURAL SAUSAGE","dept":"MEAT"},"72431019104":{"brand":"Lunds & Byerlys","desc":"L&B APPLE WILD RICE BRATWURST","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"FRESH NATURAL SAUSAGE","dept":"MEAT"},"810015573174":{"brand":"Stittsworth Meats","desc":"STITTSWORTH BRAT BACON CHED","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SMOKED SAUSAGE LINK-BEEF/PORK","dept":"MEAT"},"810015573112":{"brand":"Stittsworth Meats","desc":"STITTSWORTH BRAT 3 CHEESE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SMOKED SAUSAGE LINK-BEEF/PORK","dept":"MEAT"},"72431050572":{"brand":"Lunds & Byerlys","desc":"L&B SMOKED BRATWURST","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SMOKED SAUSAGE LINK-BEEF/PORK","dept":"MEAT"},"72431050480":{"brand":"Lunds & Byerlys","desc":"L&B COOKED BRATWURST","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SMOKED SAUSAGE LINK-BEEF/PORK","dept":"MEAT"},"72431050541":{"brand":"Lunds & Byerlys","desc":"L&B BEEF & PORK POLISH SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SMOKED SAUSAGE LINK-BEEF/PORK","dept":"MEAT"},"72431018862":{"brand":"Lunds & Byerlys","desc":"L&B COUNTRY BREAKFAST SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SMOKED SAUSAGE LINK-BEEF/PORK","dept":"MEAT"},"72431050558":{"brand":"Lunds & Byerlys","desc":"L&B SMOKED WILD RICE SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SMOKED SAUSAGE LINK-BEEF/PORK","dept":"MEAT"},"72431050534":{"brand":"Lunds & Byerlys","desc":"L&B SMOKED CHEDDAR SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SMOKED SAUSAGE LINK-BEEF/PORK","dept":"MEAT"},"72431050602":{"brand":"Lunds & Byerlys","desc":"L&B HICKORY SUMMER SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SUMMER/LIVER SAUSAGE","dept":"MEAT"},"72431050626":{"brand":"Lunds & Byerlys","desc":"L&B WILD RC SUMMER SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SUMMER/LIVER SAUSAGE","dept":"MEAT"},"72431050664":{"brand":"Lunds & Byerlys","desc":"L&B DBL SMOKED SUMMER SAUSAGE","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SUMMER/LIVER SAUSAGE","dept":"MEAT"},"810015571095":{"brand":"Stittsworth Meats","desc":"STITTSWORTH SAUS ORIGINAL","mda":"MN Grown","note":"Flagged as Local","cat":"REFRIGERATED SAUSAGE","sub":"SUMMER/LIVER SAUSAGE","dept":"MEAT"},"252060000005":{"brand":"Gold N Plump","desc":"GNP FAMILY CHICKEN THIGHS","mda":"MN Grown","note":"Flagged as Local","cat":"POULTRY CHICKEN","sub":"POULTRY CHICKEN GOLD'N PLUMP","dept":"MEAT"},"24105813051":{"brand":"Gold N Plump","desc":"GOLD'N PLUMP 813 LIVER CUP","mda":"MN Grown","note":"Flagged as Local","cat":"POULTRY CHICKEN","sub":"POULTRY CHICKEN GOLD'N PLUMP","dept":"MEAT"},"252061000004":{"brand":"Gold N Plump","desc":"GNP FAMILY CHICKEN DRUMSTICKS","mda":"MN Grown","note":"Flagged as Local","cat":"POULTRY CHICKEN","sub":"POULTRY CHICKEN GOLD'N PLUMP","dept":"MEAT"},"252051000007":{"brand":"Gold N Plump","desc":"GNP WHOLE CHICKEN","mda":"MN Grown","note":"Flagged as Local","cat":"POULTRY CHICKEN","sub":"POULTRY CHICKEN GOLD'N PLUMP","dept":"MEAT"},"252070000002":{"brand":"Gold N Plump","desc":"GNP FAMILY CHICKEN WINGS","mda":"MN Grown","note":"Flagged as Local","cat":"POULTRY CHICKEN","sub":"POULTRY CHICKEN GOLD'N PLUMP","dept":"MEAT"},"243445000000":{"brand":"Produce","desc":"PAZAZZ APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"80153034459":{"brand":"Produce","desc":"PAZAZZ APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"801530344592":{"brand":"Produce","desc":"PAZAZZ APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"741839034872":{"brand":"Produce","desc":"FIRST KISS APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"741839148869":{"brand":"Produce","desc":"FIRST KISS APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"741839148890":{"brand":"Produce","desc":"FIRST KISS APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"10025619034878":{"brand":"Produce","desc":"FIRST KISS APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"243487000006":{"brand":"Produce","desc":"FIRST KISS APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"80153034879":{"brand":"Produce","desc":"FIRST KISS APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"34870":{"brand":"Produce","desc":"FIRST KISS APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"41070":{"brand":"Produce","desc":"CHESTNUT CRAB APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"244107000000":{"brand":"Produce","desc":"CHESTNUT CRAB APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"APPLES","sub":"BULK APPLES","dept":"PRODUCE"},"850011329191":{"brand":"Fresha","desc":"FRESHA ORG CARROTS","mda":"MN Grown","note":"Flagged as Local","cat":"CARROTS","sub":"PACKAGED CARROTS","dept":"PRODUCE"},"850011329061":{"brand":"Fresha","desc":"FRESHA BABY CUT CARROTS","mda":"MN Grown","note":"Flagged as Local","cat":"CARROTS","sub":"MINI CARROTS","dept":"PRODUCE"},"850011329016":{"brand":"Fresha","desc":"FRESHA CARROTS 2#","mda":"MN Grown","note":"Flagged as Local","cat":"CARROTS","sub":"PACKAGED CARROTS","dept":"PRODUCE"},"45900":{"brand":"Amaize Sweet Corn","desc":"AMAIZE WHITE SWEET CORN","mda":"MN Grown","note":"","cat":"CORN","sub":"WHITE CORN","dept":"PRODUCE"},"71502002168":{"brand":"Amaize Sweet Corn","desc":"AMAIZE WHITE SWEET CORN","mda":"MN Grown","note":"","cat":"CORN","sub":"WHITE CORN","dept":"PRODUCE"},"72431043581":{"brand":"Lunds & Byerlys","desc":"TRIMMED BI-COLOR SWEET CORN","mda":"MN Grown","note":"","cat":"CORN","sub":"PACKAGED CORN","dept":"PRODUCE"},"244596000000":{"brand":"Produce","desc":"PICKLING CUCUMBERS","mda":"MN Grown","note":"Flagged as Local","cat":"CUCUMBER","sub":"PICKLING CUCUMBER","dept":"PRODUCE"},"855546005022":{"brand":"Produce","desc":"PICKLING CUCUMBERS","mda":"MN Grown","note":"Flagged as Local","cat":"CUCUMBER","sub":"PICKLING CUCUMBER","dept":"PRODUCE"},"18169744352":{"brand":"Lunds & Byerlys","desc":"L&B DRESSING FRENCH","mda":"MN Grown","note":"Not flagged as local","cat":"DRESSINGS","sub":"PRIVATE LABEL DRESSINGS","dept":"PRODUCE"},"18169744314":{"brand":"Lunds & Byerlys","desc":"L&B DRESSING BLUE CHEESE","mda":"MN Grown","note":"Not flagged as local","cat":"DRESSINGS","sub":"PRIVATE LABEL DRESSINGS","dept":"PRODUCE"},"18169744369":{"brand":"Lunds & Byerlys","desc":"L&B DRESSING FRENCH/BLUE CHEES","mda":"MN Grown","note":"Not flagged as local","cat":"DRESSINGS","sub":"PRIVATE LABEL DRESSINGS","dept":"PRODUCE"},"18169744376":{"brand":"Lunds & Byerlys","desc":"L&B DRESSING PARMESAN","mda":"MN Grown","note":"Not flagged as local","cat":"DRESSINGS","sub":"PRIVATE LABEL DRESSINGS","dept":"PRODUCE"},"18169744406":{"brand":"Lunds & Byerlys","desc":"L&B DRESSING SMOKEHOUSE CIDER","mda":"MN Grown","note":"Not flagged as local","cat":"DRESSINGS","sub":"PRIVATE LABEL DRESSINGS","dept":"PRODUCE"},"18169744338":{"brand":"Lunds & Byerlys","desc":"L&B DRESSING COLESLAW","mda":"MN Grown","note":"Not flagged as local","cat":"DRESSINGS","sub":"PRIVATE LABEL DRESSINGS","dept":"PRODUCE"},"865638000439":{"brand":"Revol Greens","desc":"REVOL ROMAINE CRUNCH","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH CUT SALADS","sub":"REVOL","dept":"PRODUCE"},"850024486300":{"brand":"Revol Greens","desc":"REVOL SPRING MIX","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH CUT SALADS","sub":"REVOL","dept":"PRODUCE"},"850024486034":{"brand":"Revol Greens","desc":"REVOL ORG ROMAINE CRUNCH","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH CUT SALADS","sub":"REVOL","dept":"PRODUCE"},"865638000422":{"brand":"Revol Greens","desc":"REVOL MIGHTY MIX","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH CUT SALADS","sub":"REVOL","dept":"PRODUCE"},"865638000415":{"brand":"Revol Greens","desc":"REVOL SPRING MIX","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH CUT SALADS","sub":"REVOL","dept":"PRODUCE"},"850024486027":{"brand":"Revol Greens","desc":"REVOL ORG GREEN & RED DUO","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH CUT SALADS","sub":"REVOL","dept":"PRODUCE"},"605170205042":{"brand":"Gerten's","desc":"GERTEN'S LIVING BASIL POTTED","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"860011093916":{"brand":"Krav Farms","desc":"KRAV FARMS MICRO DILL","mda":"MN Grown","note":"Not flagged as local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"198715629767":{"brand":"Krav Farms","desc":"KRAV BASIL","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"198715933888":{"brand":"Krav Farms","desc":"KRAV SPICY MIX MICROGREENS","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"860011093947":{"brand":"Krav Farms","desc":"KRAV FARMS MICRO CHIVES","mda":"MN Grown","note":"Not flagged as local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"860011093961":{"brand":"Krav Farms","desc":"KRAV FARMS MICRO CILANTR","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"860011093923":{"brand":"Krav Farms","desc":"KRAV FARMS MICRO PARSLEY","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"860014975752":{"brand":"Krav Farms","desc":"KRAV LIVING BASIL","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"198715420005":{"brand":"Krav Farms","desc":"KRAV FARMS MICRO MINT","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"198715954647":{"brand":"Krav Farms","desc":"KRAV POWER MIX MICROGREENS","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"48930":{"brand":"Produce","desc":"PICKLING DILL","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"244893000000":{"brand":"Produce","desc":"PICKLING DILL","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH HERBS","sub":"OTHER HERBS","dept":"PRODUCE"},"655360853218":{"brand":"R&R Cultivation","desc":"R&R WILD MOREL MUSHROOMS","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH MUSHROOMS","sub":"SPECIALTY MUSHROOMS","dept":"PRODUCE"},"655360741737":{"brand":"R&R Cultivation","desc":"R&R ORG MAITAKE MUSHROOMS","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH MUSHROOMS","sub":"SPECIALTY MUSHROOMS","dept":"PRODUCE"},"655360714045":{"brand":"R&R Cultivation","desc":"R&R ORG SHIITAKE MUSHROOMS","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH MUSHROOMS","sub":"SPECIALTY MUSHROOMS","dept":"PRODUCE"},"655360956988":{"brand":"R&R Cultivation","desc":"R&R ORG PIOPPINO MUSHROOMS","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH MUSHROOMS","sub":"SPECIALTY MUSHROOMS","dept":"PRODUCE"},"655360880542":{"brand":"R&R Cultivation","desc":"R&R ORG LIONS MANE SLICE MUSHR","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH MUSHROOMS","sub":"SPECIALTY MUSHROOMS","dept":"PRODUCE"},"650245033303":{"brand":"R&R Cultivation","desc":"R&R ORG SLICED SHIITAKE MUSHR","mda":"MN Grown","note":"Flagged as Local","cat":"FRESH MUSHROOMS","sub":"SPECIALTY MUSHROOMS","dept":"PRODUCE"},"735718652233":{"brand":"Produce","desc":"GREEN KALE","mda":"MN Grown","note":"Flagged as Local","cat":"LETTUCE","sub":"GREENS","dept":"PRODUCE"},"333836522072":{"brand":"Produce","desc":"GREEN KALE","mda":"MN Grown","note":"Flagged as Local","cat":"LETTUCE","sub":"GREENS","dept":"PRODUCE"},"72431048753":{"brand":"Lunds & Byerlys","desc":"ORGANIC GREEN BUTTER LETTUCE","mda":"MN Grown","note":"Flagged as Local","cat":"LETTUCE","sub":"RED LEAF","dept":"PRODUCE"},"72431048760":{"brand":"Lunds & Byerlys","desc":"ORGANIC RED BUTTER LETTUCE","mda":"MN Grown","note":"Flagged as Local","cat":"LETTUCE","sub":"RED LEAF","dept":"PRODUCE"},"244745000004":{"brand":"Produce","desc":"RHUBARB","mda":"MN Grown","note":"Flagged as Local","cat":"MISCELLANEOUS VEGETABLES","sub":"MISCELLANEOUS VEGETABLES","dept":"PRODUCE"},"47450":{"brand":"Produce","desc":"RHUBARB","mda":"MN Grown","note":"Flagged as Local","cat":"MISCELLANEOUS VEGETABLES","sub":"MISCELLANEOUS VEGETABLES","dept":"PRODUCE"},"33383510033":{"brand":"Lunds & Byerlys","desc":"B SIZE RED POTATOES","mda":"MN Grown","note":"Flagged as Local","cat":"POTATOES","sub":"BAGGED POTATOES","dept":"PRODUCE"},"33383510002":{"brand":"Produce","desc":"B SIZE RED POTATOES","mda":"MN Grown","note":"Flagged as Local","cat":"POTATOES","sub":"BAGGED POTATOES","dept":"PRODUCE"},"33383510101":{"brand":"Produce","desc":"RED POTATOES","mda":"MN Grown","note":"Flagged as Local","cat":"POTATOES","sub":"BAGGED POTATOES","dept":"PRODUCE"},"72431013980":{"brand":"Lunds & Byerlys","desc":"2# RUBY FINGERLING POTATOES","mda":"MN Grown","note":"Flagged as Local","cat":"POTATOES","sub":"BAGGED POTATOES","dept":"PRODUCE"},"72431048555":{"brand":"Lunds & Byerlys","desc":"L&B B-SIZE GOLD POTATOES","mda":"MN Grown","note":"Flagged as Local","cat":"POTATOES","sub":"PRIV LABEL BAGGED POTATOES","dept":"PRODUCE"},"72431048562":{"brand":"Lunds & Byerlys","desc":"L&B BUTTERY GOLD POTATOES","mda":"MN Grown","note":"Flagged as Local","cat":"POTATOES","sub":"PRIV LABEL BAGGED POTATOES","dept":"PRODUCE"},"72431048517":{"brand":"Lunds & Byerlys","desc":"L&B RED POTATOES","mda":"MN Grown","note":"Flagged as Local","cat":"POTATOES","sub":"PRIV LABEL BAGGED POTATOES","dept":"PRODUCE"},"72431048524":{"brand":"Lunds & Byerlys","desc":"L&B B-SIZE RED POTATOES","mda":"MN Grown","note":"Flagged as Local","cat":"POTATOES","sub":"PRIV LABEL BAGGED POTATOES","dept":"PRODUCE"},"33383670225":{"brand":"Produce","desc":"WHITE RADISHES","mda":"MN Grown","note":"Flagged as Local","cat":"RADISHES","sub":"GREEN TOP RADISHES","dept":"PRODUCE"},"244740000009":{"brand":"Produce","desc":"WHITE RADISHES","mda":"MN Grown","note":"Flagged as Local","cat":"RADISHES","sub":"GREEN TOP RADISHES","dept":"PRODUCE"},"716053205957":{"brand":"Minn Tofu","desc":"MINN TOFU EXTRA FIRM","mda":"MN Grown","note":"Flagged as Local","cat":"SPECIALTY VEGETABLES","sub":"ASIAN","dept":"PRODUCE"},"768114864009":{"brand":"Minn Tofu","desc":"MINN TOFU FIRM","mda":"MN Grown","note":"Flagged as Local","cat":"SPECIALTY VEGETABLES","sub":"ASIAN","dept":"PRODUCE"},"713194434239":{"brand":"You Betcha Fermentcha","desc":"YOU BETCHA ORG MILD KIMCHI","mda":"MN Grown","note":"Flagged as Local","cat":"SPECIALTY VEGETABLES","sub":"ASIAN","dept":"PRODUCE"},"713194434246":{"brand":"You Betcha Fermentcha","desc":"YOU BETCHA ORG MEDIUM KIMCHI","mda":"MN Grown","note":"Flagged as Local","cat":"SPECIALTY VEGETABLES","sub":"ASIAN","dept":"PRODUCE"},"749565092777":{"brand":"Minn Tofu","desc":"MINN SPROUT BEAN SPROUTS","mda":"MN Grown","note":"Flagged as Local","cat":"SPROUTS","sub":"RV PACKAGED SPROUTS","dept":"PRODUCE"},"31310":{"brand":"Produce","desc":"PIE PUMPKINS","mda":"MN Grown","note":"Flagged as Local","cat":"SQUASH","sub":"ORNAM PUMPKINS","dept":"PRODUCE"},"243135000006":{"brand":"Produce","desc":"DECORATIVE GOURDS","mda":"MN Grown","note":"Flagged as Local","cat":"SQUASH","sub":"ORNAM SQUASH/FALL ITEMS","dept":"PRODUCE"},"860002421827":{"brand":"Produce","desc":"PIE PUMPKINS","mda":"MN Grown","note":"Flagged as Local","cat":"SQUASH","sub":"PIE PUMPKINS","dept":"PRODUCE"},"243134000007":{"brand":"Produce","desc":"PIE PUMPKINS","mda":"MN Grown","note":"Flagged as Local","cat":"SQUASH","sub":"PIE PUMPKINS","dept":"PRODUCE"},"865072000361":{"brand":"Copperwing Distillery","desc":"COPPERWING OLD FASHIONED","mda":"Made in Minnesota","note":"Flagged as Local","cat":"ALCOHOLIC MIX DRINKS","sub":"RTD BOTTLES MIXED DRINKS","dept":"SPIRITS"},"865072000385":{"brand":"Copperwing Distillery","desc":"COPPERWING WILDERNESS","mda":"Made in Minnesota","note":"Flagged as Local","cat":"ALCOHOLIC MIX DRINKS","sub":"RTD BOTTLES MIXED DRINKS","dept":"SPIRITS"},"810095561351":{"brand":"Modist Brewing","desc":"MODIST GRAPE APE COCKTAIL","mda":"Made in Minnesota","note":"Flagged as Local","cat":"ALCOHOLIC MIX DRINKS","sub":"RTD CANS MIXED DRINKS","dept":"SPIRITS"},"852064007323":{"brand":"Dampfwerk Distilling","desc":"DAMPFWERK ORANGE LIQUEUR","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CORDIALS & LIQUEURS","sub":"CORDIALS & LIQUEURS","dept":"SPIRITS"},"852064007262":{"brand":"Dampfwerk Distilling","desc":"DAMPFWERKS PFEFFERMINZ SCHNAPP","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CORDIALS & LIQUEURS","sub":"CORDIALS & LIQUEURS","dept":"SPIRITS"},"852064007026":{"brand":"Dampfwerk Distilling","desc":"DAMPFWERKS HELGOLANDER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CORDIALS & LIQUEURS","sub":"CORDIALS & LIQUEURS","dept":"SPIRITS"},"856004005288":{"brand":"J. Carver","desc":"J CARVER SEVILLA ORANGE LIQ","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CORDIALS & LIQUEURS","sub":"CORDIALS & LIQUEURS","dept":"SPIRITS"},"787790209041":{"brand":"Loon Liquors","desc":"LOONMAN AQUAVIT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CORDIALS & LIQUEURS","sub":"CORDIALS & LIQUEURS","dept":"SPIRITS"},"19962669811":{"brand":"Loon Liquors","desc":"LOON LAC COEUR COFFEE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CORDIALS & LIQUEURS","sub":"CORDIALS & LIQUEURS","dept":"SPIRITS"},"855340004016":{"brand":"Panther Distillery","desc":"PANTHER SPIKED APPLE SPIRIT","mda":"Made in Minnesota","note":"Not flagged as local","cat":"CORDIALS & LIQUEURS","sub":"CORDIALS & LIQUEURS","dept":"SPIRITS"},"853054006258":{"brand":"Vikre","desc":"VIKRE APERITIVO CLASSICO","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CORDIALS & LIQUEURS","sub":"CORDIALS & LIQUEURS","dept":"SPIRITS"},"862367000037":{"brand":"Vikre","desc":"VIKRE ORVEVANN AQUAVIT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"CORDIALS & LIQUEURS","sub":"CORDIALS & LIQUEURS","dept":"SPIRITS"},"865072000392":{"brand":"Copperwing Distillery","desc":"COPPERWING FRESAS GIN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"GIN","sub":"GIN","dept":"SPIRITS"},"865072000330":{"brand":"Copperwing Distillery","desc":"COPPERWING GIN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"GIN","sub":"GIN","dept":"SPIRITS"},"852064007224":{"brand":"Dampfwerk Distilling","desc":"DAMPFWERKS THE CRANE FLORAL GN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"GIN","sub":"GIN","dept":"SPIRITS"},"856004005400":{"brand":"J. Carver","desc":"J CARVER BARREL RESTED GIN","mda":"Made in Minnesota","note":"Not flagged as local","cat":"GIN","sub":"GIN","dept":"SPIRITS"},"856004005035":{"brand":"J. Carver","desc":"J CARVER PREMIUM GIN","mda":"Made in Minnesota","note":"Not flagged as local","cat":"GIN","sub":"GIN","dept":"SPIRITS"},"787790208945":{"brand":"Loon Liquors","desc":"LOONMAN GIN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"GIN","sub":"GIN","dept":"SPIRITS"},"853054006371":{"brand":"Vikre","desc":"VIKRE STRWBRRY RHUBARB GIN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"GIN","sub":"GIN","dept":"SPIRITS"},"862367000020":{"brand":"Vikre","desc":"VIKRE BOREAL CEDAR GIN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"GIN","sub":"GIN","dept":"SPIRITS"},"862367000006":{"brand":"Vikre","desc":"VIKRE BOREAL JUNIPER GIN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"GIN","sub":"GIN","dept":"SPIRITS"},"862367000013":{"brand":"Vikre","desc":"VIKRE BOREAL SPRUCE GIN","mda":"Made in Minnesota","note":"Flagged as Local","cat":"GIN","sub":"GIN","dept":"SPIRITS"},"860017000758":{"brand":"Brother Justus","desc":"BROTHER JUSTUS COLD PEATED","mda":"Made in Minnesota","note":"Flagged as Local","cat":"MISC WHISKEYS","sub":"WHISKEY OTHER","dept":"SPIRITS"},"860017000734":{"brand":"Brother Justus","desc":"BROTHER JUSTUS SINGLE MALT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"MISC WHISKEYS","sub":"WHISKEY OTHER","dept":"SPIRITS"},"850046325113":{"brand":"Brother Justus","desc":"BROTHER JUSTUS L&B SNGL BRRL","mda":"Made in Minnesota","note":"Flagged as Local","cat":"MISC WHISKEYS","sub":"WHISKEY OTHER","dept":"SPIRITS"},"860017000727":{"brand":"Brother Justus","desc":"BROTHER JUSTUS SILVER","mda":"Made in Minnesota","note":"Flagged as Local","cat":"MISC WHISKEYS","sub":"WHISKEY OTHER","dept":"SPIRITS"},"852064007248":{"brand":"Dampfwerk Distilling","desc":"DAMPFWERKS SINGLE MALT","mda":"Made in Minnesota","note":"Flagged as Local","cat":"MISC WHISKEYS","sub":"WHISKEY OTHER","dept":"SPIRITS"},"857986008946":{"brand":"Cantilever","desc":"CANTILEVER STRAIGHT BOURBON","mda":"Made in Minnesota","note":"Not flagged as local","cat":"STRAIGHT WHISKEY","sub":"BOURBON WHISKEY","dept":"SPIRITS"},"865072000309":{"brand":"Copperwing Distillery","desc":"COPPERWING BOURBON","mda":"Made in Minnesota","note":"Flagged as Local","cat":"STRAIGHT WHISKEY","sub":"BOURBON WHISKEY","dept":"SPIRITS"},"856004005264":{"brand":"J. Carver","desc":"J CARVER HUNT CLUB DOUBLE RYE","mda":"Made in Minnesota","note":"Not flagged as local","cat":"STRAIGHT WHISKEY","sub":"RYE WHISKEY","dept":"SPIRITS"},"856004005189":{"brand":"J. Carver","desc":"J CARVER MINNESOTA RYE WHISKEY","mda":"Made in Minnesota","note":"Not flagged as local","cat":"STRAIGHT WHISKEY","sub":"RYE WHISKEY","dept":"SPIRITS"},"852955008156":{"brand":"10000 Drops","desc":"10000 DROPS LOKAL MEYER LEMON","mda":"Made in Minnesota","note":"Flagged as Local","cat":"VODKA","sub":"VODKA","dept":"SPIRITS"},"852955008125":{"brand":"10000 Drops","desc":"10000 DROPS LOKAL VODKA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"VODKA","sub":"VODKA","dept":"SPIRITS"},"852955008118":{"brand":"10000 Drops","desc":"10000 DROPS LOKAL VODKA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"VODKA","sub":"VODKA","dept":"SPIRITS"},"852955008132":{"brand":"10000 Drops","desc":"10000 DROPS LOKAL BLOOD ORANGE","mda":"Made in Minnesota","note":"Flagged as Local","cat":"VODKA","sub":"VODKA","dept":"SPIRITS"},"860199002618":{"brand":"Gray Duck Spirits","desc":"GRAY DUCK VODKA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"VODKA","sub":"VODKA","dept":"SPIRITS"},"860199002601":{"brand":"Gray Duck Spirits","desc":"GRAY DUCK VODKA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"VODKA","sub":"VODKA","dept":"SPIRITS"},"862367000044":{"brand":"Vikre","desc":"VIKRE LAKE SUPERIOR VODKA","mda":"Made in Minnesota","note":"Flagged as Local","cat":"VODKA","sub":"VODKA","dept":"SPIRITS"},"8015303445":{"brand":"Produce","desc":"PAZZAZ APPLES","mda":"MN Grown","note":"Flagged as Local","cat":"","sub":"","dept":""}};
+
+const STORE_URLS = {
+  "St. Louis Park": "https://script.google.com/macros/s/AKfycbwSgzlb9k1mr25FtnOXNfRxUwNbtQ1OKYhwsbscZqxLIlS7nTh8g-z_1DAYs3dRRJZB1A/exec",
+  "Golden Valley":  "https://script.google.com/a/macros/umn.edu/s/AKfycbw56dmi5F93xRtykSvvpTg7YyYjJY895z8R4dl_YuUQkixObRILmdrY1vaoikwfSDfrEg/exec",
+  "Chanhassen":     "https://script.google.com/macros/s/AKfycbyOtTliswaG15U1HSW9s1SqQoVJ7feDeLWwYYJkpgEwGvuDEhGt3GQPAkp0wsZzVhBi/exec",
+  "Burnsville":     "https://script.google.com/macros/s/AKfycbwaomiHDMgkDfaEiG9dwmpVIeM2779S_Kfv7BlNEiZSu383foLb4s3nzv9UBfdAn-VsNw/exec",
+  "Eagan":          "https://script.google.com/macros/s/AKfycbycf-6PIolm1iUGVrvQOzj7Hi8lKw7TwTcJqpHcMjBjbkitMmAG6PLNtan415BiHb47qA/exec"
+};
+
+const STORE_RSIDS = {
+  "St. Louis Park":  "1007",
+  "Golden Valley":   "1001",
+  "Burnsville":      "1011",
+  "Chanhassen":      "1012",
+  "Eagan":           "1013",
+  "Maple Grove":     "15014",
+  "Woodbury":        "15031",
+  "Plymouth":        "51009",
+  "White Bear Lake": "51019"
+};
+
+function lookup(raw) {
+  // Clean: remove dashes, spaces
+  const c = String(raw).replace(/[-\s]/g, '');
+
+  // Build variants to try
+  const stripped = c.replace(/^0+/, '') || c; // strip leading zeros
+  const variants = [
+    c,                              // as-is from scanner
+    stripped,                       // leading zeros stripped
+    c.padStart(13, '0'),            // padded to 13
+    c.padStart(12, '0'),            // padded to 12
+    stripped.slice(0, -1),          // drop check digit (stripped)
+    c.slice(0, -1),                 // drop check digit (raw)
+  ];
+
+  for (const v of variants) {
+    if (!v) continue;
+    // Try exact match
+    if (PRODUCTS[v]) return { upc: v, product: PRODUCTS[v] };
+    // Try stripping leading zeros of DB key
+    const vStripped = v.replace(/^0+/, '');
+    for (const [key, prod] of Object.entries(PRODUCTS)) {
+      if (key.replace(/^0+/, '') === vStripped) return { upc: key, product: prod };
+    }
+  }
+  return null;
+}
+
+// ── STATE ────────────────────────────────────────────────────
+let workerName='', storeName='', storeUrl='', storeRsid='';
+let tagCount=0, taggedUPCs=new Set(), lastTaggedUPC=null;
+let lastScanned='', lastScanTime=0;
+let html5QrCode=null, scannerOn=false, currentUPC=null;
+
+// ── LOCAL STORAGE ─────────────────────────────────────────────
+function saveProgress() {
+  try {
+    localStorage.setItem('lb_workerName',   workerName);
+    localStorage.setItem('lb_storeName',    storeName);
+    localStorage.setItem('lb_tagCount',     tagCount);
+    localStorage.setItem('lb_taggedUPCs',   JSON.stringify([...taggedUPCs]));
+    localStorage.setItem('lb_lastTaggedUPC',lastTaggedUPC || '');
+  } catch(e) { console.warn('localStorage save failed', e); }
+}
+
+function loadProgress() {
+  try {
+    const saved = localStorage.getItem('lb_storeName');
+    if (!saved) return false;
+    storeName    = saved;
+    workerName   = localStorage.getItem('lb_workerName') || '';
+    tagCount     = parseInt(localStorage.getItem('lb_tagCount') || '0');
+    taggedUPCs   = new Set(JSON.parse(localStorage.getItem('lb_taggedUPCs') || '[]'));
+    lastTaggedUPC = localStorage.getItem('lb_lastTaggedUPC') || null;
+    storeUrl     = STORE_URLS[storeName]  || '';
+    storeRsid    = STORE_RSIDS[storeName] || '';
+    return true;
+  } catch(e) { return false; }
+}
+
+function clearProgress() {
+  try {
+    ['lb_workerName','lb_storeName','lb_tagCount','lb_taggedUPCs','lb_lastTaggedUPC']
+      .forEach(k => localStorage.removeItem(k));
+  } catch(e) {}
+}
+
+// ── SESSION ──────────────────────────────────────────────────
+function startSession() {
+  const name  = document.getElementById('inp-name').value.trim();
+  const store = document.getElementById('inp-store').value;
+  const err   = document.getElementById('setup-err');
+  if (!name)  { err.textContent='Please enter your name.'; return; }
+  if (!store) { err.textContent='Please select a store.';  return; }
+  workerName=name; storeName=store;
+  storeUrl=STORE_URLS[store]||''; storeRsid=STORE_RSIDS[store]||'';
+  tagCount=0; taggedUPCs=new Set(); lastTaggedUPC=null;
+  clearProgress();
+  document.getElementById('header').style.display='flex';
+  document.getElementById('tab-bar').style.display='flex';
+  document.getElementById('status-bar').style.display='flex';
+  document.getElementById('header-sub').textContent=store;
+  document.getElementById('worker-badge').textContent='\u{1F464} '+name;
+  buildFilters();
+  switchTab('scanner');
+  setStatus('ok','Ready');
+  updateCount();
+}
+
+// ── TABS ─────────────────────────────────────────────────────
+function switchTab(tab) {
+  if (tab !== 'scanner') stopScanner();
+  const pageId = tab === 'scanner' ? 'main' : tab;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + pageId).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+}
+
+// ── RESULT CARD ──────────────────────────────────────────────
+function showResult(rawCode) {
+  currentUPC = rawCode;
+  const card  = document.getElementById('result-card');
+  const found = lookup(rawCode);
+  if (!found) {
+    card.innerHTML = `
+      <div class="result-label">Scanned</div>
+      <div class="result-code">${rawCode}</div>
+      <div class="do-not-tag-box">
+        <div class="do-not-tag-title">&#128683; Do Not Tag</div>
+      </div>
+      <button class="btn-big btn-big-red" onclick="scanNext()">&#128247; &nbsp;Scan Next Product</button>`;
+    card.className='result-card show miss';
+    showToast('Not in list','err');
+    return;
+  }
+  const {upc, product:p} = found;
+  const isMIM = p.mda==='Made in Minnesota';
+  const tagClass = isMIM?'mim':'mgrown';
+  const tagIcon  = isMIM?'&#127981;':'&#127807;';
+  const tagFull  = isMIM?'Made in Minnesota (MIM)':'MN Grown (MG)';
+
+  card.innerHTML = `
+    <div class="result-label">Scanned</div>
+    <div class="result-code">${rawCode}</div>
+    <div class="result-brand">${p.brand}</div>
+    <div class="result-desc">${p.desc}</div>
+    <div class="tag-box ${tagClass}">
+      <div class="tag-label">Apply this tag</div>
+      <div class="tag-name">${tagIcon} ${tagFull}</div>
+    </div>
+    <button class="btn-big btn-big-green" id="btn-apply" onclick="applyTag('${upc}')">&#10003; &nbsp;Apply Tag</button>`;
+  card.className='result-card show found';
+  showToast(p.desc.slice(0,30),'ok');
+}
+
+// ── APPLY TAG (scanner) ──────────────────────────────────────
+function applyTag(upc) {
+  // Clear card and restart camera immediately on tap
+  const card = document.getElementById('result-card');
+  card.className='result-card'; card.innerHTML='';
+  currentUPC=null; lastScanned='';
+  if (!scannerOn) startScanner();
+
+  // Update state and save
+  const alreadyTagged = taggedUPCs.has(upc);
+  taggedUPCs.add(upc); lastTaggedUPC=upc;
+  if (!alreadyTagged) { tagCount++; }
+  updateCount(); renderList(); updateUndoTab(); saveProgress();
+  showToast('&#10003; Tagged!','ok');
+
+  // Fire-and-forget to Google Sheets
+  fetch(storeUrl, {
+    method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'tag', tab:document.getElementById('f-dept').value||'PRODUCE', upc, workerName})
+  }).catch(() => showToast('Network error','err'));
+}
+
+// ── SCAN NEXT ────────────────────────────────────────────────
+function scanNext() {
+  const card = document.getElementById('result-card');
+  card.className='result-card'; card.innerHTML='';
+  currentUPC=null; lastScanned='';
+  if (!scannerOn) startScanner();
+}
+
+// ── MANUAL TAB ───────────────────────────────────────────────
+function lookupManual() {
+  const raw = document.getElementById('manual-upc').value.trim();
+  if (!raw) return;
+  const upc = raw.replace(/[-\s]/g,'');
+  document.getElementById('manual-upc').value='';
+  const found = lookup(upc);
+  const resultDiv = document.getElementById('manual-result');
+  if (!found) {
+    resultDiv.innerHTML=`<div class="result-card show miss">
+      <div class="result-label">Entered</div>
+      <div class="result-code">${upc}</div>
+      <div class="do-not-tag-box">
+        <div class="do-not-tag-title">&#128683; Do Not Tag</div>
+      </div></div>`;
+    return;
+  }
+  const {upc:matchedUpc, product:p} = found;
+  const isMIM = p.mda==='Made in Minnesota';
+  const tagClass=isMIM?'mim':'mgrown';
+  const tagIcon=isMIM?'&#127981;':'&#127807;';
+  const tagFull=isMIM?'Made in Minnesota (MIM)':'MN Grown (MG)';
+  resultDiv.innerHTML=`<div class="result-card show found">
+    <div class="result-label">Entered</div>
+    <div class="result-code">${upc}</div>
+    <div class="result-brand">${p.brand}</div>
+    <div class="result-desc">${p.desc}</div>
+    <div class="tag-box ${tagClass}">
+      <div class="tag-label">Apply this tag</div>
+      <div class="tag-name">${tagIcon} ${tagFull}</div>
+    </div>
+    <button class="btn-big btn-big-green" id="btn-apply-manual" onclick="applyTagManual('${matchedUpc}')">&#10003; &nbsp;Apply Tag</button>
+  </div>`;
+}
+
+function applyTagManual(upc) {
+  const btn = document.getElementById('btn-apply-manual');
+  if (btn) btn.style.display='none';
+  taggedUPCs.add(upc); lastTaggedUPC=upc;
+  renderList(); updateUndoTab();
+  fetch(storeUrl, {
+    method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'tag', tab:document.getElementById('f-dept').value||'PRODUCE', upc, workerName})
+  }).then(() => {
+    tagCount++; updateCount(); saveProgress(); showToast('&#10003; Tagged!','ok');
+    const resultDiv = document.getElementById('manual-result');
+    const nb = document.createElement('button');
+    nb.className='btn-big btn-big-green'; nb.style.marginTop='10px';
+    nb.innerHTML='&#128247; &nbsp;Go to Scanner';
+    nb.onclick = () => switchTab('scanner');
+    resultDiv.querySelector('.result-card').appendChild(nb);
+  }).catch(() => showToast('Network error','err'));
+}
+
+// ── UNDO TAB ─────────────────────────────────────────────────
+function undoLast() {
+  if (!lastTaggedUPC) return;
+  const upc = lastTaggedUPC;
+  lastTaggedUPC=null;
+  taggedUPCs.delete(upc);
+  tagCount=Math.max(0,tagCount-1);
+  updateCount(); renderList(); updateUndoTab(); saveProgress();
+  fetch(storeUrl, {
+    method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({action:'undo', tab:document.getElementById('f-dept').value||'PRODUCE', upc, workerName:''})
+  }).then(() => showToast('&#8617; Undone','warn'))
+    .catch(() => showToast('Network error','err'));
+}
+
+function updateUndoTab() {
+  const btn  = document.getElementById('btn-undo-big');
+  const info = document.getElementById('undo-info');
+  if (lastTaggedUPC) {
+    const p = PRODUCTS[lastTaggedUPC] || Object.values(PRODUCTS).find(v => v) || {};
+    info.textContent = 'Last tagged: ' + (p.desc || lastTaggedUPC);
+    info.classList.add('show');
+    btn.disabled=false;
+  } else {
+    info.classList.remove('show');
+    btn.disabled=true;
+  }
+}
+
+// ── SCANNER ──────────────────────────────────────────────────
+function startScanner() {
+  if (typeof Html5Qrcode==='undefined') { showToast('Scanner not loaded','err'); return; }
+  document.getElementById('scanner-wrap').style.display='block';
+  document.getElementById('btn-start').style.display='none';
+  document.getElementById('btn-stop').style.display='block';
+  const hint = document.getElementById('scan-hint');
+  hint.style.display='none';
+  setStatus('on','Scanning\u2026');
+  html5QrCode = new Html5Qrcode('qr-reader');
+  html5QrCode.start(
+    {facingMode:'environment'},
+    {fps:15, qrbox:{width:280,height:120},
+     formatsToSupport:[
+       Html5QrcodeSupportedFormats.EAN_13, Html5QrcodeSupportedFormats.EAN_8,
+       Html5QrcodeSupportedFormats.UPC_A,  Html5QrcodeSupportedFormats.UPC_E,
+       Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,
+       Html5QrcodeSupportedFormats.ITF
+     ]},
+    (decodedText) => {
+      const now=Date.now();
+      if (decodedText===lastScanned && now-lastScanTime<4000) return;
+      lastScanned=decodedText; lastScanTime=now;
+      showResult(decodedText);
+    },
+    ()=>{}
+  ).catch(err => { showToast('Camera error: '+err,'err'); stopScanner(); });
+  scannerOn=true;
+}
+
+function stopScanner() {
+  if (html5QrCode && scannerOn) {
+    html5QrCode.stop().then(()=>{ html5QrCode.clear(); html5QrCode=null; }).catch(()=>{});
+    scannerOn=false;
+  }
+  document.getElementById('scanner-wrap').style.display='none';
+  document.getElementById('btn-start').style.display='block';
+  document.getElementById('btn-stop').style.display='none';
+  document.getElementById('scan-hint').style.display='block';
+  setStatus('ok','Ready');
+}
+
+// ── FILTERS ──────────────────────────────────────────────────
+function buildFilters() {
+  const depts=[...new Set(Object.values(PRODUCTS).map(p=>p.dept&&p.dept.trim()).filter(Boolean))].sort();
+  const deptSel=document.getElementById('f-dept');
+  deptSel.innerHTML='<option value="">&#8212; All Departments &#8212;</option>';
+  depts.forEach(d=>{const o=document.createElement('option');o.value=o.textContent=d;deptSel.appendChild(o);});
+  document.getElementById('f-cat').innerHTML='<option value="">&#8212; All Categories &#8212;</option>';
+  document.getElementById('f-sub').innerHTML='<option value="">&#8212; All Subcategories &#8212;</option>';
+  renderList();
+}
+
+function onDeptChange() {
+  const dept=document.getElementById('f-dept').value;
+  const cats=[...new Set(Object.values(PRODUCTS).filter(p=>!dept||(p.dept&&p.dept.trim()===dept)).map(p=>p.cat&&p.cat.trim()).filter(Boolean))].sort();
+  const catSel=document.getElementById('f-cat');
+  catSel.innerHTML='<option value="">&#8212; All Categories &#8212;</option>';
+  cats.forEach(c=>{const o=document.createElement('option');o.value=o.textContent=c;catSel.appendChild(o);});
+  document.getElementById('f-sub').innerHTML='<option value="">&#8212; All Subcategories &#8212;</option>';
+  renderList();
+}
+
+function onCatChange() {
+  const dept=document.getElementById('f-dept').value;
+  const cat=document.getElementById('f-cat').value;
+  const subs=[...new Set(Object.values(PRODUCTS).filter(p=>(!dept||(p.dept&&p.dept.trim()===dept))&&(!cat||(p.cat&&p.cat.trim()===cat))).map(p=>p.sub&&p.sub.trim()).filter(Boolean))].sort();
+  const subSel=document.getElementById('f-sub');
+  subSel.innerHTML='<option value="">&#8212; All Subcategories &#8212;</option>';
+  subs.forEach(s=>{const o=document.createElement('option');o.value=o.textContent=s;subSel.appendChild(o);});
+  renderList();
+}
+
+function renderList() {
+  const dept=document.getElementById('f-dept').value;
+  const cat=document.getElementById('f-cat').value;
+  const sub=document.getElementById('f-sub').value;
+  // Show only real UPC_EAN entries (those with cat/dept filled = 600 products)
+  let entries=Object.entries(PRODUCTS).filter(([upc,p])=>p.cat);
+  if (dept) entries=entries.filter(([,p])=>p.dept&&p.dept.trim()===dept);
+  if (cat)  entries=entries.filter(([,p])=>p.cat&&p.cat.trim()===cat);
+  if (sub)  entries=entries.filter(([,p])=>p.sub&&p.sub.trim()===sub);
+  entries=entries.filter(([upc])=>!taggedUPCs.has(upc));
+  entries.sort((a,b)=>a[1].desc.localeCompare(b[1].desc));
+  const allWithCat = Object.entries(PRODUCTS).filter(([,p])=>p.cat);
+  const deptAll    = dept ? allWithCat.filter(([,p])=>p.dept&&p.dept.trim()===dept) : allWithCat;
+  const catAll     = cat  ? deptAll.filter(([,p])=>p.cat&&p.cat.trim()===cat)       : deptAll;
+  const subAll     = sub  ? catAll.filter(([,p])=>p.sub&&p.sub.trim()===sub)         : catAll;
+  const catTagged  = catAll.filter(([upc])=>taggedUPCs.has(upc)).length;
+  const catRemain  = catAll.length - catTagged;
+  const subTagged  = subAll.filter(([upc])=>taggedUPCs.has(upc)).length;
+  const subRemain  = subAll.length - subTagged;
+  let counterHTML = '';
+  // Only show subcategory counter if selected, else show simple total
+  if (sub) {
+    counterHTML = `<div class="filter-counter-row"><span class="filter-counter-nums"><span class="rem">${subRemain}</span> remaining &nbsp;&middot;&nbsp; <span class="tag">${subTagged}</span> tagged</span></div>`;
+  } else {
+    counterHTML = `<div class="filter-counter-row"><span class="filter-counter-nums"><span class="rem">${entries.length}</span> remaining &nbsp;&middot;&nbsp; <span class="tag">${tagCount}</span> tagged</span></div>`;
+  }
+  document.getElementById('filter-counter').innerHTML = counterHTML;
+  document.getElementById('list-count').textContent=entries.length+' products';
+  const list=document.getElementById('product-list');
+  if (!entries.length) { list.innerHTML='<div class="empty-state">&#127881; All done in this section!</div>'; return; }
+  list.innerHTML=entries.map(([upc,p])=>{
+    const isMIM=p.mda==='Made in Minnesota';
+    const tagClass=isMIM?'mim':'mgrown';
+    const tagLabel=isMIM?'&#127981; MIM':'&#127807; MG';
+    const upc14=upc.padStart(14,'0');
+    const lbUrl=storeRsid?`https://www.lundsandbyerlys.com/sm/pickup/rsid/${storeRsid}/product/${upc14}`:'#';
+    return `<div class="product-item">
+      <div class="product-item-info">
+        <div class="product-item-brand">${p.brand||''}</div>
+        <div class="product-item-desc">${p.desc||''}</div>
+        <div class="product-item-upc">${upc}</div>
+      </div>
+      <div class="product-item-actions">
+        <span class="tag-badge ${tagClass}">${tagLabel}</span>
+        <a class="lb-link" href="${lbUrl}" target="_blank">&#128722; View</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── HELPERS ──────────────────────────────────────────────────
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+}
+function changeWorker() {
+  stopScanner();
+  document.getElementById('header').style.display='none';
+  document.getElementById('tab-bar').style.display='none';
+  document.getElementById('status-bar').style.display='none';
+  showPage('setup');
+}
+function setStatus(state,txt) {
+  document.getElementById('status-txt').textContent=txt;
+  document.getElementById('dot').className='dot'+(state?' '+state:'');
+}
+function updateCount() {
+  document.getElementById('count-txt').textContent=tagCount+' tagged';
+  renderList();
+}
+function setSaving(on) {
+  document.getElementById('saving-indicator').style.display=on?'block':'none';
+}
+function showToast(msg,type) {
+  const t=document.getElementById('toast');
+  t.innerHTML=msg; t.className='toast show'+(type?' '+type:'');
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800);
+}
+
+
+
+// ── RESTORE SESSION ──────────────────────────────────────────
+function continueSession() {
+  document.getElementById('restore-banner').classList.remove('show');
+  document.getElementById('header').style.display='flex';
+  document.getElementById('tab-bar').style.display='flex';
+  document.getElementById('status-bar').style.display='flex';
+  document.getElementById('header-sub').textContent=storeName;
+  document.getElementById('worker-badge').textContent='\u{1F464} '+workerName;
+  document.getElementById('inp-name').value=workerName;
+  document.getElementById('inp-store').value=storeName;
+  buildFilters();
+  switchTab('scanner');
+  setStatus('ok','Session restored \u2013 '+tagCount+' tagged');
+  updateCount();
+  updateUndoTab();
+}
+
+function newSession() {
+  // Keep taggedUPCs and storeName so already-tagged products stay gone from list
+  // Only reset worker identity and counter
+  const savedUPCs  = new Set(taggedUPCs);  // preserve tagged set
+  const savedStore = storeName;             // preserve store
+  clearProgress();
+  // Restore only the tagged UPCs and store back into localStorage
+  workerName=''; tagCount=0; lastTaggedUPC=null;
+  storeName=savedStore; storeUrl=STORE_URLS[savedStore]||''; storeRsid=STORE_RSIDS[savedStore]||'';
+  taggedUPCs=savedUPCs;
+  // Save the preserved UPCs back so they survive page reload too
+  try {
+    localStorage.setItem('lb_taggedUPCs', JSON.stringify([...taggedUPCs]));
+    localStorage.setItem('lb_storeName',  storeName);
+  } catch(e) {}
+  document.getElementById('restore-banner').classList.remove('show');
+  showPage('setup');
+}
+
+window.addEventListener('load', function() {
+  if (loadProgress() && storeName && workerName) {
+    document.getElementById('restore-title').textContent = 'Welcome back, ' + workerName + '!';
+    document.getElementById('restore-sub').textContent =
+      storeName + '\n' + tagCount + ' product' + (tagCount !== 1 ? 's' : '') + ' tagged in last session.';
+    document.getElementById('restore-banner').classList.add('show');
+  }
+});
+
+</script>
