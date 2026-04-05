@@ -744,15 +744,17 @@ function lookupManual() {
 }
 
 function applyTagManual(upc) {
+	console.log("In apply tag for UPC -", upc);
   const btn = document.getElementById('btn-apply-manual');
   if (btn) btn.style.display='none';
   taggedUPCs.add(upc); lastTaggedUPC=upc;
   renderList(); updateUndoTab();
+   console.log("the dept is - ", document.getElementById('f-dept').value);
   fetch(storeUrl, {
     method:'POST', mode:'no-cors',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({action:'tag', tab:document.getElementById('f-dept').value||'PRODUCE', upc, workerName})
-  }).then(() => {
+  }).then(() => {	
     tagCount++; updateCount(); saveProgress(); showToast('&#10003; Tagged!','ok');
     const resultDiv = document.getElementById('manual-result');
     const nb = document.createElement('button');
