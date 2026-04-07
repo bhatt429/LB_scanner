@@ -672,13 +672,15 @@ function showResult(rawCode) {
 function applyTag(upc) {
   const card = document.getElementById('result-card');
   card.className='result-card'; card.innerHTML='';
-  currentUPC=null; lastScanned='';
+  currentUPC=null;
+  // Prevent camera from immediately re-scanning the same barcode
+  lastScanned=upc; lastScanTime=Date.now();
   if (!scannerOn) startScanner();
 
   const alreadyValidated = validatedUPCs.has(upc);
   validatedUPCs.add(upc); lastTaggedUPC=upc;
   if (!alreadyValidated) { tagCount++; }
-  updateCount(); renderList(); updateUndoTab(); saveProgress();
+  updateCount(); updateUndoTab(); saveProgress();
   showToast('&#10003; Validated!','ok');
 
   const dept = PRODUCTS[upc]?.dept;
