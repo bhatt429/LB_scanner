@@ -654,7 +654,6 @@ function showResult(rawCode) {
   const tagIcon  = isMIM?'&#127981;':'&#127807;';
   const tagFull  = isMIM?'Made in Minnesota (MIM)':'MN Grown (MG)';
   const isTagged = taggedUPCs.has(upc);
-  const isValidated = validatedUPCs.has(upc);
 
   card.innerHTML = `
     <div class="result-label">Scanned</div>
@@ -668,11 +667,7 @@ function showResult(rawCode) {
       <div class="tag-label">Label type</div>
       <div class="tag-name">${tagIcon} ${tagFull}</div>
     </div>
-    ${isValidated
-      ? `<div style="text-align:center;color:#1a7a42;font-weight:700;padding:12px">&#10003;&#10003; Already validated</div>
-         <button class="btn-big btn-big-red" onclick="scanNext()">&#128247; &nbsp;Scan Next</button>`
-      : `<button class="btn-big btn-big-green" id="btn-apply" onclick="applyTag('${upc}')">&#10003; &nbsp;Validate</button>`
-    }`;
+    <button class="btn-big btn-big-green" id="btn-apply" onclick="applyTag('${upc}')">&#10003; &nbsp;Validate</button>`;
   card.className='result-card show found';
   showToast(p.desc.slice(0,30),'ok');
 }
