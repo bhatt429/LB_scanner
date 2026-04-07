@@ -882,13 +882,14 @@ function renderList() {
   const catRemain  = catAll.length - catTagged;
   const subTagged  = subAll.filter(([upc])=>taggedUPCs.has(upc)).length;
   const subRemain  = subAll.length - subTagged;
-  let counterHTML = '';
-  // Only show subcategory counter if selected, else show simple total
-  if (sub) {
-    counterHTML = `<div class="filter-counter-row"><span class="filter-counter-nums"><span class="rem">${subRemain}</span> remaining &nbsp;&middot;&nbsp; <span class="tag">${subTagged}</span> tagged</span></div>`;
-  } else {
-    counterHTML = `<div class="filter-counter-row"><span class="filter-counter-nums"><span class="rem">${entries.length}</span> remaining &nbsp;&middot;&nbsp; <span class="tag">${tagCount}</span> tagged</span></div>`;
-  }
+  const deptTagged = deptAll.filter(([upc])=>taggedUPCs.has(upc)).length;
+  const deptRemain = deptAll.length - deptTagged;
+  let cRemain, cTagged;
+  if (sub)       { cRemain=subRemain;  cTagged=subTagged;  }
+  else if (cat)  { cRemain=catRemain;  cTagged=catTagged;  }
+  else if (dept) { cRemain=deptRemain; cTagged=deptTagged; }
+  else           { cRemain=entries.length; cTagged=tagCount; }
+  let counterHTML = `<div class="filter-counter-row"><span class="filter-counter-nums"><span class="rem">${cRemain}</span> remaining &nbsp;&middot;&nbsp; <span class="tag">${cTagged}</span> tagged</span></div>`;
   document.getElementById('filter-counter').innerHTML = counterHTML;
   document.getElementById('list-count').textContent=entries.length+' products';
   const list=document.getElementById('product-list');
