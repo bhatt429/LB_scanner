@@ -164,7 +164,7 @@
     overflow:hidden; background:#000; margin-bottom:10px;
     display:none;
   }
-  #qr-reader { border:none !important; padding:0 !important; width:100% !important; height:250px !important; }
+  #qr-reader { border:none !important; padding:0 !important; width:100% !important; }
   #qr-reader video { width:100% !important; height:100% !important; object-fit:cover !important; border-radius:0 !important; }
   #qr-reader img { display:none !important; }
   #qr-reader__scan_region { padding:0 !important; }
@@ -906,7 +906,7 @@ function renderList() {
     const lbUrl=storeRsid?`https://www.lundsandbyerlys.com/sm/pickup/rsid/${storeRsid}/product/${urlUpc}`:'#';
     const upc13=upc14.slice(0,-1);
     const shelfLabel=upc13.slice(0,3)+'-'+upc13.slice(3,8)+'-'+upc13.slice(8);
-    return `<div class="product-item">
+    return `<div class="product-item" onclick="tagFromList('${upc}')" style="cursor:pointer;">
       <div class="product-item-info">
         <div class="product-item-brand">${p.brand||''}</div>
         <div class="product-item-desc">${p.desc||''}</div>
@@ -915,10 +915,41 @@ function renderList() {
       </div>
       <div class="product-item-actions">
         <span class="tag-badge ${tagClass}">${tagLabel}</span>
-        <a class="lb-link" href="${lbUrl}" target="_blank">&#128722; View</a>
+        <a class="lb-link" href="${lbUrl}" target="_blank" onclick="event.stopPropagation()">&#128722; View</a>
       </div>
     </div>`;
   }).join('');
+}
+
+// ── TAG FROM LIST ─────────────────────────────────────────────
+function tagFromList(upc) {
+  const p = PRODUCTS[upc];
+  if (!p) return;
+  const isMIM    = p.mda==='Made in Minnesota';
+  const tagClass = isMIM?'mim':'mgrown';
+  const tagIcon  = isMIM?'&#127981;':'&#127807;';
+  const tagFull  = isMIM?'Made in Minnesota (MIM)':'MN Grown (MG)';
+  const upc14    = upc.padStart(14,'0');
+  const urlUpc   = upc.startsWith('264')?upc14.slice(0,-1)+'0':upc14;
+  const lbUrl    = storeRsid?`https://www.lundsandbyerlys.com/sm/pickup/rsid/${storeRsid}/product/${urlUpc}`:'#';
+  const card     = document.getElementById('result-card');
+  card.innerHTML = `
+    <div class="result-label">From List</div>
+    <div class="result-code">${upc}</div>
+    <div class="result-brand">${p.brand}</div>
+    <div class="result-desc">${p.desc}</div>
+    <div class="result-hierarchy">${p.dept||''} &rsaquo; ${p.cat||''} &rsaquo; ${p.sub||''}</div>
+    <div class="tag-box ${tagClass}">
+      <div class="tag-label">Apply this tag</div>
+      <div class="tag-name">${tagIcon} ${tagFull}</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn-big btn-big-green" style="flex:2" id="btn-apply" onclick="applyTag('${upc}')">&#10003; &nbsp;Apply Tag</button>
+      <a class="btn-big btn-big-red" style="flex:1;text-align:center;text-decoration:none;line-height:1.2;padding-top:18px;" href="${lbUrl}" target="_blank">&#128722; View</a>
+    </div>`;
+  card.className='result-card show found';
+  // Scroll to result card
+  card.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
 // ── HELPERS ──────────────────────────────────────────────────
