@@ -660,7 +660,7 @@ function showResult(rawCode) {
     <div class="result-code">${rawCode}</div>
     <div class="result-brand">${p.brand}</div>
     <div class="result-desc">${p.desc}</div>
-    <div class="result-hierarchy">${p.dept||''} &rsaquo; ${p.cat||''} &rsaquo; ${p.sub||''}${p.seqnum ? ' &nbsp;&middot;&nbsp; <strong>#'+p.seqnum+'</strong>' : ''}</div>
+    <div class="result-hierarchy">${p.dept||''} &rsaquo; ${p.cat||''} &rsaquo; ${p.sub||''}${p.seqnum ? ' &nbsp;&middot;&nbsp; #'+p.seqnum : ''}</div>
     <div class="tag-box ${tagClass}">
       <div class="tag-label">Apply this tag</div>
       <div class="tag-name">${tagIcon} ${tagFull}</div>
@@ -730,7 +730,7 @@ function lookupManual() {
     <div class="result-code">${upc}</div>
     <div class="result-brand">${p.brand}</div>
     <div class="result-desc">${p.desc}</div>
-    <div class="result-hierarchy">${p.dept||''} &rsaquo; ${p.cat||''} &rsaquo; ${p.sub||''}${p.seqnum ? ' &nbsp;&middot;&nbsp; <strong>#'+p.seqnum+'</strong>' : ''}</div>
+    <div class="result-hierarchy">${p.dept||''} &rsaquo; ${p.cat||''} &rsaquo; ${p.sub||''}${p.seqnum ? ' &nbsp;&middot;&nbsp; #'+p.seqnum : ''}</div>
     <div class="tag-box ${tagClass}">
       <div class="tag-label">Apply this tag</div>
       <div class="tag-name">${tagIcon} ${tagFull}</div>
@@ -943,7 +943,7 @@ function tagFromList(upc) {
     <div class="result-code">${upc}</div>
     <div class="result-brand">${p.brand}</div>
     <div class="result-desc">${p.desc}</div>
-    <div class="result-hierarchy">${p.dept||''} &rsaquo; ${p.cat||''} &rsaquo; ${p.sub||''}${p.seqnum ? ' &nbsp;&middot;&nbsp; <strong>#'+p.seqnum+'</strong>' : ''}</div>
+    <div class="result-hierarchy">${p.dept||''} &rsaquo; ${p.cat||''} &rsaquo; ${p.sub||''}${p.seqnum ? ' &nbsp;&middot;&nbsp; #'+p.seqnum : ''}</div>
     <div class="tag-box ${tagClass}">
       <div class="tag-label">Apply this tag</div>
       <div class="tag-name">${tagIcon} ${tagFull}</div>
