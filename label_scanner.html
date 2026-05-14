@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Label Scanner</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;600;700;900&display=swap');
+  :root { --maroon:#7A0C2E; --maroon-dark:#5a0920; --gold:#F0B722; --cream:#F5F0E8; --white:#ffffff; --text:#1a0a10; --muted:#9a7a84; --border:#ddd0d4; --success:#1a7a42; --success-bg:#edfaf3; --error:#c0182e; --error-bg:#fff0f2; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--cream); color:var(--text); font-family:"DM Sans",sans-serif; min-height:100vh; }
+  .header { background:var(--maroon); padding:13px 18px; display:none; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(122,12,46,0.3); }
+  .header.show { display:flex; }
+  .header-title { color:#fff; font-size:16px; font-weight:900; }
+  .header-right { background:var(--gold); color:var(--maroon-dark); font-family:"Space Mono",monospace; font-size:11px; font-weight:700; padding:5px 12px; border-radius:20px; cursor:pointer; }
+  .page { display:none; } .page.active { display:block; }
+  .setup-wrap { padding:24px 20px; max-width:460px; margin:0 auto; }
+  .setup-card { background:var(--white); border-radius:18px; padding:32px 26px; box-shadow:0 2px 16px rgba(122,12,46,0.1); margin-top:16px; }
+  .logo { text-align:center; margin-bottom:28px; }
+  .logo-title { font-size:26px; font-weight:900; color:var(--maroon); }
+  .logo-sub { font-size:13px; color:var(--muted); margin-top:4px; }
+  .field-wrap { margin-bottom:18px; }
+  .field-label { display:block; font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:7px; font-family:"Space Mono",monospace; }
+  .field-input { width:100%; padding:13px 15px; border-radius:12px; border:2px solid var(--border); background:var(--cream); color:var(--text); font-family:"DM Sans",sans-serif; font-size:15px; outline:none; transition:border 0.2s; appearance:none; }
+  .field-input:focus { border-color:var(--maroon); }
+  .upload-area { border:2px dashed var(--border); border-radius:12px; padding:22px; text-align:center; cursor:pointer; background:var(--cream); transition:border-color 0.2s; }
+  .upload-area:hover { border-color:var(--maroon); background:#f5eaee; }
+  .upload-area.done { border-color:var(--success); background:var(--success-bg); border-style:solid; }
+  .upload-icon { font-size:28px; margin-bottom:6px; }
+  .upload-text { font-size:14px; font-weight:700; color:var(--maroon); }
+  .upload-area.done .upload-text { color:var(--success); }
+  .upload-sub { font-size:12px; color:var(--muted); margin-top:3px; }
+  #file-input { display:none; }
+  .btn-primary { display:block; width:100%; padding:16px; border-radius:12px; border:none; background:var(--maroon); color:#fff; font-family:"DM Sans",sans-serif; font-weight:700; font-size:16px; cursor:pointer; }
+  .btn-primary:active { background:var(--maroon-dark); }
+  .setup-err { text-align:center; font-size:13px; color:var(--error); margin-top:10px; min-height:18px; }
+  .scan-wrap { max-width:460px; margin:0 auto; padding:14px 14px 80px; }
+  .store-bar { background:var(--white); border-radius:12px; padding:11px 16px; margin-bottom:14px; border:2px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .store-name { font-size:14px; font-weight:700; color:var(--maroon); }
+  .store-sub  { font-size:11px; color:var(--muted); font-family:"Space Mono",monospace; }
+  .btn-change { font-size:11px; font-weight:700; color:var(--maroon); background:none; border:1.5px solid var(--border); padding:5px 10px; border-radius:8px; cursor:pointer; }
+  .camera-card { background:var(--white); border-radius:14px; border:2px solid var(--border); margin-bottom:14px; overflow:hidden; }
+  .camera-inner { padding:14px; }
+  .scanner-wrap { position:relative; width:100%; border-radius:10px; overflow:hidden; background:#000; display:none; margin-bottom:10px; }
+  #qr-reader { border:none!important; padding:0!important; width:100%!important; }
+  #qr-reader video { width:100%!important; height:100%!important; object-fit:cover!important; border-radius:0!important; }
+  #qr-reader img { display:none!important; } #qr-reader__scan_region { padding:0!important; } #qr-reader__dashboard { display:none!important; }
+  .scan-overlay { position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+  .scan-frame { width:78%; height:32%; position:relative; }
+  .scan-frame::before,.scan-frame::after,.scan-frame span::before,.scan-frame span::after { content:""; position:absolute; width:22px; height:22px; border-color:var(--gold); border-style:solid; }
+  .scan-frame::before  { top:0;left:0;   border-width:3px 0 0 3px; border-radius:3px 0 0 0; }
+  .scan-frame::after   { top:0;right:0;  border-width:3px 3px 0 0; border-radius:0 3px 0 0; }
+  .scan-frame span::before { bottom:0;left:0;  border-width:0 0 3px 3px; border-radius:0 0 0 3px; }
+  .scan-frame span::after  { bottom:0;right:0; border-width:0 3px 3px 0; border-radius:0 0 3px 0; }
+  .scan-line { position:absolute; left:4%; right:4%; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); animation:scanline 2s ease-in-out infinite; box-shadow:0 0 10px var(--gold); }
+  @keyframes scanline { 0%{top:4%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:96%;opacity:0} }
+  .btn-cam-start { display:block; width:100%; padding:18px; border-radius:10px; border:none; background:var(--maroon); color:#fff; font-family:"DM Sans",sans-serif; font-weight:900; font-size:17px; cursor:pointer; }
+  .btn-cam-stop  { display:none;  width:100%; padding:18px; border-radius:10px; border:none; background:var(--error);  color:#fff; font-family:"DM Sans",sans-serif; font-weight:900; font-size:17px; cursor:pointer; }
+  .scan-hint { text-align:center; font-size:13px; font-weight:700; color:var(--muted); padding:8px 0 0; animation:hintBlink 1.4s ease-in-out infinite; }
+  @keyframes hintBlink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .result-card { border-radius:16px; padding:22px 20px; display:none; border:2px solid transparent; animation:popIn 0.22s cubic-bezier(0.175,0.885,0.32,1.275); margin-bottom:14px; }
+  .result-card.show  { display:block; }
+  .result-card.found { background:var(--success-bg); border-color:#a8e6c3; }
+  .result-card.miss  { background:var(--error-bg);   border-color:#f5b8c0; }
+  @keyframes popIn { from{transform:scale(0.93) translateY(6px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
+  .result-scanned { font-family:"Space Mono",monospace; font-size:11px; color:var(--muted); margin-bottom:10px; }
+  .section-badge { display:inline-block; padding:4px 14px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; font-family:"Space Mono",monospace; margin-bottom:12px; }
+  .badge-remove   { background:#ffeaea; color:var(--error);  border:1.5px solid #f5b8c0; }
+  .badge-rotation { background:#fff6e0; color:#9a5a00;       border:1.5px solid #f0c060; }
+  .badge-other    { background:#eaf0ff; color:#1a3a8a;       border:1.5px solid #b0c4f0; }
+  .result-sl       { font-size:48px; font-weight:900; color:var(--maroon); line-height:1; font-family:"Space Mono",monospace; }
+  .result-sl-label { font-size:11px; color:var(--muted); font-family:"Space Mono",monospace; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:12px; }
+  .result-brand    { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:2px; }
+  .result-desc     { font-size:18px; font-weight:900; line-height:1.25; margin-bottom:6px; }
+  .result-meta     { font-size:11px; color:var(--muted); font-family:"Space Mono",monospace; }
+  .not-found-title { font-size:20px; font-weight:900; color:var(--error); margin-bottom:4px; }
+  .not-found-sub   { font-size:13px; color:var(--muted); }
+  .btn-next { display:block; width:100%; padding:15px; border-radius:12px; border:none; background:var(--maroon); color:#fff; font-family:"DM Sans",sans-serif; font-weight:700; font-size:15px; cursor:pointer; margin-top:14px; }
+  .status-bar { background:var(--white); border-top:1px solid var(--border); padding:8px 18px; display:none; justify-content:space-between; font-size:11px; color:var(--muted); font-family:"Space Mono",monospace; position:fixed; bottom:0; left:0; right:0; z-index:80; }
+  .status-bar.show { display:flex; }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#ccc; margin-right:5px; vertical-align:middle; }
+  .dot.on { background:var(--gold); animation:pulse 1.5s infinite; }
+  .dot.ok { background:var(--success); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .toast { position:fixed; bottom:52px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--maroon); color:#fff; padding:11px 24px; border-radius:30px; font-weight:700; font-size:13px; z-index:999; transition:transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275); white-space:nowrap; box-shadow:0 4px 16px rgba(122,12,46,0.4); pointer-events:none; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+  .toast.ok { background:var(--success); } .toast.err { background:var(--error); }
+</style>
+</head>
+<body>
+
+<div class="header" id="header">
+  <div class="header-title">Label Scanner</div>
+  <div class="header-right" onclick="goSetup()">⚙ Change</div>
+</div>
+
+<div class="page active" id="page-setup">
+  <div class="setup-wrap">
+    <div class="setup-card">
+      <div class="logo">
+        <div class="logo-title">Label Scanner</div>
+        <div class="logo-sub">Scan · Match · Done</div>
+      </div>
+      <div class="field-wrap">
+        <label class="field-label">Store</label>
+        <select class="field-input" id="inp-store">
+          <option value="">— Select store —</option>
+          <option>Golden Valley</option>
+          <option>St. Louis Park</option>
+          <option>Burnsville</option>
+          <option>Chanhassen</option>
+          <option>Eagan</option>
+          <option>Maple Grove</option>
+          <option>Woodbury</option>
+          <option>Plymouth</option>
+          <option>White Bear Lake</option>
+        </select>
+      </div>
+      <div class="field-wrap">
+        <label class="field-label">Upload Store File (.xlsx)</label>
+        <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
+          <div class="upload-icon">📂</div>
+          <div class="upload-text" id="upload-text">Tap to choose file</div>
+          <div class="upload-sub"  id="upload-sub">Excel .xlsx file</div>
+        </div>
+        <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFile(this)">
+      </div>
+      <button class="btn-primary" onclick="startApp()">Start Scanning →</button>
+      <div class="setup-err" id="setup-err"></div>
+    </div>
+  </div>
+</div>
+
+<div class="page" id="page-scanner">
+  <div class="scan-wrap">
+    <div class="store-bar">
+      <div>
+        <div class="store-name" id="disp-store"></div>
+        <div class="store-sub"  id="disp-file"></div>
+      </div>
+      <button class="btn-change" onclick="goSetup()">Change</button>
+    </div>
+    <div class="camera-card">
+      <div class="camera-inner">
+        <div class="scanner-wrap" id="scanner-wrap">
+          <div id="qr-reader"></div>
+          <div class="scan-overlay"><div class="scan-frame"><span></span><div class="scan-line"></div></div></div>
+        </div>
+        <button class="btn-cam-start" id="btn-start-cam" onclick="startScanner()">▶  Start Camera</button>
+        <button class="btn-cam-stop"  id="btn-stop-cam"  onclick="stopScanner()">■  Stop Camera</button>
+        <div class="scan-hint" id="scan-hint">Tap above to start scanning</div>
+      </div>
+    </div>
+    <div class="result-card" id="result-card"></div>
+  </div>
+</div>
+
+<div class="status-bar" id="status-bar">
+  <span><span class="dot" id="dot"></span><span id="status-txt">Ready</span></span>
+  <span id="prod-count"></span>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+let products = {}, storeName = '', fileName = '';
+let html5QrCode = null, scannerOn = false;
+let lastScanned = '', lastScanTime = 0;
+
+function handleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  fileName = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb   = XLSX.read(e.target.result, { type:'array', raw:true });
+      const ws   = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'', raw:false });
+      parseRows(rows);
+    } catch(err) { showToast('File read error', 'err'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseRows(rows) {
+  products = {};
+  const hdr   = rows[0].map(h => String(h).trim().toLowerCase());
+  const iSl   = hdr.indexOf('sl. no');
+  const iDesc = hdr.findIndex(h => h === 'description');
+  const iBrand= hdr.findIndex(h => h === 'brandname');
+  const iDept = hdr.findIndex(h => h === 'dept');
+  const iCat  = hdr.findIndex(h => h === 'category');
+  const iSub  = hdr.findIndex(h => h === 'subcategory');
+  const iLong = hdr.findIndex(h => h === 'long_upc_ean');
+  if (iLong === -1) { showToast('Long_UPC_EAN column not found!', 'err'); return; }
+
+  let section = 'UNKNOWN';
+  for (let i = 1; i < rows.length; i++) {
+    const row  = rows[i];
+    const sl   = String(row[iSl]   || '').trim();
+    const desc = String(row[iDesc] || '').trim();
+    const long = String(row[iLong] || '').trim();
+    if (!sl && desc.includes('---')) { section = desc.replace(/---/g,'').trim().toUpperCase(); continue; }
+    if (!sl || !long || long === 'Long_UPC_EAN') continue;
+    products[long.replace(/\s/g,'')] = {
+      sl, section,
+      brand: String(row[iBrand]||'').trim(),
+      desc,
+      dept:  String(row[iDept] ||'').trim(),
+      cat:   String(row[iCat]  ||'').trim(),
+      sub:   String(row[iSub]  ||'').trim(),
+    };
+  }
+  const count = Object.keys(products).length;
+  document.getElementById('upload-area').classList.add('done');
+  document.getElementById('upload-text').textContent = '✓ ' + fileName;
+  document.getElementById('upload-sub').textContent  = count + ' products loaded';
+  document.getElementById('prod-count').textContent  = count + ' products';
+  showToast(count + ' products loaded', 'ok');
+}
+
+function lookup(raw) {
+  const c = String(raw).replace(/[\s\-]/g,'');
+  const s = c.replace(/^0+/,'') || c;
+  const variants = [c, s, c.padStart(13,'0'), c.padStart(12,'0'), s.slice(0,-1), c.slice(0,-1)];
+  for (const v of variants) {
+    if (!v) continue;
+    if (products[v]) return products[v];
+    const vs = v.replace(/^0+/,'');
+    for (const [key,p] of Object.entries(products)) {
+      if (key.replace(/^0+/,'') === vs) return p;
+    }
+  }
+  return null;
+}
+
+function startApp() {
+  storeName = document.getElementById('inp-store').value;
+  const err = document.getElementById('setup-err');
+  if (!storeName) { err.textContent = 'Please select a store.'; return; }
+  if (!Object.keys(products).length) { err.textContent = 'Please upload the store file first.'; return; }
+  err.textContent = '';
+  document.getElementById('header').classList.add('show');
+  document.getElementById('status-bar').classList.add('show');
+  document.getElementById('disp-store').textContent = storeName;
+  document.getElementById('disp-file').textContent  = fileName;
+  showPage('scanner');
+  setStatus('ok','Ready');
+}
+
+function goSetup() {
+  stopScanner();
+  document.getElementById('header').classList.remove('show');
+  document.getElementById('status-bar').classList.remove('show');
+  showPage('setup');
+}
+
+function startScanner() {
+  document.getElementById('scanner-wrap').style.display   = 'block';
+  document.getElementById('btn-start-cam').style.display  = 'none';
+  document.getElementById('btn-stop-cam').style.display   = 'block';
+  document.getElementById('scan-hint').style.display      = 'none';
+  setStatus('on','Scanning…');
+  html5QrCode = new Html5Qrcode('qr-reader');
+  html5QrCode.start(
+    {facingMode:'environment'},
+    {fps:15, qrbox:{width:280,height:120},
+     formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.ITF]},
+    decodedText => {
+      const now = Date.now();
+      if (decodedText === lastScanned && now - lastScanTime < 4000) return;
+      lastScanned = decodedText; lastScanTime = now;
+      showResult(decodedText);
+    }, () => {}
+  ).catch(err => { showToast('Camera error','err'); stopScanner(); });
+  scannerOn = true;
+}
+
+function stopScanner() {
+  if (html5QrCode && scannerOn) { html5QrCode.stop().then(()=>{ html5QrCode.clear(); html5QrCode=null; }).catch(()=>{}); scannerOn=false; }
+  document.getElementById('scanner-wrap').style.display   = 'none';
+  document.getElementById('btn-start-cam').style.display  = 'block';
+  document.getElementById('btn-stop-cam').style.display   = 'none';
+  document.getElementById('scan-hint').style.display      = 'block';
+  setStatus('ok','Ready');
+}
+
+function showResult(rawCode) {
+  const card  = document.getElementById('result-card');
+  const found = lookup(rawCode);
+  if (!found) {
+    card.innerHTML = `<div class="result-scanned">Scanned: ${rawCode}</div><div class="not-found-title">🚫 Not Found</div><div class="not-found-sub">This barcode is not in the store file.</div><button class="btn-next" onclick="scanNext()">📷 Scan Next</button>`;
+    card.className = 'result-card show miss';
+    showToast('Not found','err');
+    return;
+  }
+  const sec = found.section.toLowerCase();
+  const bc  = sec.includes('remove') ? 'badge-remove' : sec.includes('rotation') ? 'badge-rotation' : 'badge-other';
+  card.innerHTML = `
+    <div class="result-scanned">Scanned: ${rawCode}</div>
+    <div class="section-badge ${bc}">${found.section}</div>
+    <div class="result-sl">#${found.sl}</div>
+    <div class="result-sl-label">Sl. No</div>
+    <div class="result-brand">${found.brand}</div>
+    <div class="result-desc">${found.desc}</div>
+    <div class="result-meta">${found.dept} › ${found.cat}${found.sub ? ' › '+found.sub : ''}</div>
+    <button class="btn-next" onclick="scanNext()">📷 Scan Next</button>`;
+  card.className = 'result-card show found';
+  showToast('#'+found.sl+' · '+found.section,'ok');
+}
+
+function scanNext() {
+  document.getElementById('result-card').className = 'result-card';
+  document.getElementById('result-card').innerHTML = '';
+  lastScanned = '';
+  if (!scannerOn) startScanner();
+}
+
+function showPage(n) { document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById('page-'+n).classList.add('active'); }
+function setStatus(s,t) { document.getElementById('status-txt').textContent=t; document.getElementById('dot').className='dot'+(s?' '+s:''); }
+function showToast(msg,type) { const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(type?' '+type:''); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800); }
+</script>
+</body>
+</html>
