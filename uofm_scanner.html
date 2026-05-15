@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>UofM Category Scanner</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;600;700;900&display=swap');
+  :root { --maroon:#7A0C2E; --maroon-dark:#5a0920; --gold:#F0B722; --cream:#F5F0E8; --white:#ffffff; --text:#1a0a10; --muted:#9a7a84; --border:#ddd0d4; --success:#1a7a42; --success-bg:#edfaf3; --error:#c0182e; --error-bg:#fff0f2; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--cream); color:var(--text); font-family:"DM Sans",sans-serif; min-height:100vh; }
+  .header { background:var(--maroon); padding:13px 18px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(122,12,46,0.3); }
+  .header-title { color:#fff; font-size:16px; font-weight:900; }
+  .header-count { background:var(--gold); color:var(--maroon-dark); font-family:"Space Mono",monospace; font-size:11px; font-weight:700; padding:5px 12px; border-radius:20px; }
+
+  .loading-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:80vh; padding:24px; text-align:center; }
+  .loading-spinner { width:48px; height:48px; border:4px solid var(--border); border-top-color:var(--maroon); border-radius:50%; animation:spin 0.8s linear infinite; margin-bottom:20px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .loading-title { font-size:18px; font-weight:900; color:var(--maroon); margin-bottom:6px; }
+  .loading-sub { font-size:13px; color:var(--muted); }
+  .load-err { color:var(--error); font-size:14px; font-weight:700; }
+
+  .scan-wrap { max-width:460px; margin:0 auto; padding:14px 14px 80px; }
+  .camera-card { background:var(--white); border-radius:14px; border:2px solid var(--border); margin-bottom:14px; overflow:hidden; }
+  .camera-inner { padding:14px; }
+  .scanner-wrap { position:relative; width:100%; border-radius:10px; overflow:hidden; background:#000; display:none; margin-bottom:10px; }
+  #qr-reader { border:none!important; padding:0!important; width:100%!important; }
+  #qr-reader video { width:100%!important; height:100%!important; object-fit:cover!important; border-radius:0!important; }
+  #qr-reader img { display:none!important; } #qr-reader__scan_region { padding:0!important; } #qr-reader__dashboard { display:none!important; }
+  .scan-overlay { position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+  .scan-frame { width:78%; height:32%; position:relative; }
+  .scan-frame::before,.scan-frame::after,.scan-frame span::before,.scan-frame span::after { content:""; position:absolute; width:22px; height:22px; border-color:var(--gold); border-style:solid; }
+  .scan-frame::before  { top:0;left:0;   border-width:3px 0 0 3px; border-radius:3px 0 0 0; }
+  .scan-frame::after   { top:0;right:0;  border-width:3px 3px 0 0; border-radius:0 3px 0 0; }
+  .scan-frame span::before { bottom:0;left:0;  border-width:0 0 3px 3px; border-radius:0 0 0 3px; }
+  .scan-frame span::after  { bottom:0;right:0; border-width:0 3px 3px 0; border-radius:0 0 3px 0; }
+  .scan-line { position:absolute; left:4%; right:4%; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); animation:scanline 2s ease-in-out infinite; box-shadow:0 0 10px var(--gold); }
+  @keyframes scanline { 0%{top:4%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:96%;opacity:0} }
+  .btn-cam-start { display:block; width:100%; padding:18px; border-radius:10px; border:none; background:var(--maroon); color:#fff; font-family:"DM Sans",sans-serif; font-weight:900; font-size:17px; cursor:pointer; }
+  .btn-cam-stop  { display:none;  width:100%; padding:18px; border-radius:10px; border:none; background:var(--error);  color:#fff; font-family:"DM Sans",sans-serif; font-weight:900; font-size:17px; cursor:pointer; }
+  .scan-hint { text-align:center; font-size:13px; font-weight:700; color:var(--muted); padding:8px 0 0; animation:hintBlink 1.4s ease-in-out infinite; }
+  @keyframes hintBlink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .result-card { border-radius:16px; padding:22px 20px; display:none; border:2px solid transparent; animation:popIn 0.22s cubic-bezier(0.175,0.885,0.32,1.275); margin-bottom:14px; }
+  .result-card.show  { display:block; }
+  .result-card.found { background:var(--success-bg); border-color:#a8e6c3; }
+  .result-card.miss  { background:var(--error-bg);   border-color:#f5b8c0; }
+  @keyframes popIn { from{transform:scale(0.93) translateY(6px);opacity:0} to{transform:scale(1) translateY(0);opacity:1} }
+  .result-scanned { font-family:"Space Mono",monospace; font-size:11px; color:var(--muted); margin-bottom:10px; }
+  .result-brand { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:4px; }
+  .result-desc  { font-size:20px; font-weight:900; line-height:1.25; margin-bottom:14px; color:var(--maroon); }
+  .result-row   { display:flex; flex-direction:column; gap:8px; }
+  .result-pill-label { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; font-family:"Space Mono",monospace; color:var(--muted); margin-bottom:3px; }
+  .result-pill  { display:inline-block; background:var(--white); border:2px solid var(--border); border-radius:10px; padding:10px 14px; font-size:15px; font-weight:700; color:var(--text); width:100%; }
+  .result-pill.cat { border-color:var(--gold); background:#fffbee; }
+  .result-pill.sub { border-color:#a8e6c3; background:#edfaf3; }
+  .not-found-title { font-size:20px; font-weight:900; color:var(--error); margin-bottom:4px; }
+  .not-found-sub   { font-size:13px; color:var(--muted); }
+  .btn-next { display:block; width:100%; padding:15px; border-radius:12px; border:none; background:var(--maroon); color:#fff; font-family:"DM Sans",sans-serif; font-weight:700; font-size:15px; cursor:pointer; margin-top:14px; }
+
+  .status-bar { background:var(--white); border-top:1px solid var(--border); padding:8px 18px; display:flex; justify-content:space-between; font-size:11px; color:var(--muted); font-family:"Space Mono",monospace; position:fixed; bottom:0; left:0; right:0; z-index:80; }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#ccc; margin-right:5px; vertical-align:middle; }
+  .dot.on { background:var(--gold); animation:pulse 1.5s infinite; }
+  .dot.ok { background:var(--success); }
+  .dot.load { background:var(--maroon); animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .toast { position:fixed; bottom:52px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--maroon); color:#fff; padding:11px 24px; border-radius:30px; font-weight:700; font-size:13px; z-index:999; transition:transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275); white-space:nowrap; box-shadow:0 4px 16px rgba(122,12,46,0.4); pointer-events:none; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+  .toast.ok { background:var(--success); } .toast.err { background:var(--error); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">Category Scanner</div>
+  <div class="header-count" id="header-count">Loading…</div>
+</div>
+
+<!-- Loading screen -->
+<div id="loading-screen" class="loading-screen">
+  <div class="loading-spinner"></div>
+  <div class="loading-title">Loading product data…</div>
+  <div class="loading-sub" id="load-sub">Fetching from database</div>
+</div>
+
+<!-- Scanner (hidden until loaded) -->
+<div id="main" style="display:none">
+  <div class="scan-wrap">
+    <div class="camera-card">
+      <div class="camera-inner">
+        <div class="scanner-wrap" id="scanner-wrap">
+          <div id="qr-reader"></div>
+          <div class="scan-overlay"><div class="scan-frame"><span></span><div class="scan-line"></div></div></div>
+        </div>
+        <button class="btn-cam-start" id="btn-start-cam" onclick="startScanner()">▶  Start Camera</button>
+        <button class="btn-cam-stop"  id="btn-stop-cam"  onclick="stopScanner()">■  Stop Camera</button>
+        <div class="scan-hint" id="scan-hint">Tap above to start scanning</div>
+      </div>
+    </div>
+    <div class="result-card" id="result-card"></div>
+  </div>
+</div>
+
+<div class="status-bar">
+  <span><span class="dot" id="dot"></span><span id="status-txt">Loading…</span></span>
+  <span id="prod-count"></span>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+let products = {};
+let html5QrCode = null, scannerOn = false;
+let lastScanned = '', lastScanTime = 0;
+
+// ── LOAD DATA ─────────────────────────────────────────────────
+async function loadData() {
+  try {
+    setStatus('load', 'Loading…');
+    const resp = await fetch('uofm_data.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    products = await resp.json();
+    const count = Object.keys(products).length;
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    document.getElementById('header-count').textContent = count.toLocaleString() + ' products';
+    document.getElementById('prod-count').textContent   = count.toLocaleString() + ' products';
+    setStatus('ok', 'Ready');
+    showToast(count.toLocaleString() + ' products loaded', 'ok');
+  } catch(err) {
+    document.getElementById('load-sub').innerHTML = '<span class="load-err">Failed to load data: ' + err.message + '</span>';
+    setStatus('', 'Error');
+  }
+}
+
+// ── LOOKUP ────────────────────────────────────────────────────
+function lookup(raw) {
+  const c  = String(raw).replace(/[\s\-]/g,'');
+  const s  = c.replace(/^0+/,'') || c;
+  const variants = [c, s, c.padStart(13,'0'), c.padStart(12,'0'), s.slice(0,-1), c.slice(0,-1)];
+  for (const v of variants) {
+    if (!v) continue;
+    if (products[v]) return products[v];
+    const vs = v.replace(/^0+/,'');
+    for (const [key,p] of Object.entries(products)) {
+      if (key.replace(/^0+/,'') === vs) return p;
+    }
+  }
+  return null;
+}
+
+// ── SCANNER ───────────────────────────────────────────────────
+function startScanner() {
+  document.getElementById('scanner-wrap').style.display  = 'block';
+  document.getElementById('btn-start-cam').style.display = 'none';
+  document.getElementById('btn-stop-cam').style.display  = 'block';
+  document.getElementById('scan-hint').style.display     = 'none';
+  setStatus('on','Scanning…');
+  html5QrCode = new Html5Qrcode('qr-reader');
+  html5QrCode.start(
+    {facingMode:'environment'},
+    {fps:15, qrbox:{width:280,height:120},
+     formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.ITF]},
+    decodedText => {
+      const now = Date.now();
+      if (decodedText === lastScanned && now - lastScanTime < 4000) return;
+      lastScanned = decodedText; lastScanTime = now;
+      showResult(decodedText);
+    }, () => {}
+  ).catch(() => { showToast('Camera error','err'); stopScanner(); });
+  scannerOn = true;
+}
+
+function stopScanner() {
+  if (html5QrCode && scannerOn) { html5QrCode.stop().then(()=>{ html5QrCode.clear(); html5QrCode=null; }).catch(()=>{}); scannerOn=false; }
+  document.getElementById('scanner-wrap').style.display  = 'none';
+  document.getElementById('btn-start-cam').style.display = 'block';
+  document.getElementById('btn-stop-cam').style.display  = 'none';
+  document.getElementById('scan-hint').style.display     = 'block';
+  setStatus('ok','Ready');
+}
+
+// ── RESULT ────────────────────────────────────────────────────
+function showResult(rawCode) {
+  const card  = document.getElementById('result-card');
+  const found = lookup(rawCode);
+  if (!found) {
+    card.innerHTML = `
+      <div class="result-scanned">Scanned: ${rawCode}</div>
+      <div class="not-found-title">🚫 Not Found</div>
+      <div class="not-found-sub">This barcode is not in the database.</div>
+      <button class="btn-next" onclick="scanNext()">📷 Scan Next</button>`;
+    card.className = 'result-card show miss';
+    showToast('Not found','err');
+    return;
+  }
+  card.innerHTML = `
+    <div class="result-scanned">Scanned: ${rawCode}</div>
+    <div class="result-brand">${found.brand} · ${found.dept}</div>
+    <div class="result-desc">${found.desc}</div>
+    <div class="result-row">
+      <div>
+        <div class="result-pill-label">Category</div>
+        <div class="result-pill cat">${found.cat}</div>
+      </div>
+      <div>
+        <div class="result-pill-label">Subcategory</div>
+        <div class="result-pill sub">${found.sub}</div>
+      </div>
+    </div>
+    <button class="btn-next" onclick="scanNext()">📷 Scan Next</button>`;
+  card.className = 'result-card show found';
+  showToast(found.cat, 'ok');
+}
+
+function scanNext() {
+  document.getElementById('result-card').className = 'result-card';
+  document.getElementById('result-card').innerHTML = '';
+  lastScanned = '';
+  if (!scannerOn) startScanner();
+}
+
+function setStatus(s,t) { document.getElementById('status-txt').textContent=t; document.getElementById('dot').className='dot'+(s?' '+s:''); }
+function showToast(msg,type) { const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(type?' '+type:''); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800); }
+
+loadData();
+</script>
+</body>
+</html>
