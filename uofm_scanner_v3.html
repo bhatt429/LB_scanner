@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Label Scanner</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;600;700;900&display=swap');
+  :root { --maroon:#7A0C2E; --maroon-dark:#5a0920; --gold:#F0B722; --cream:#F5F0E8; --white:#fff; --text:#1a0a10; --muted:#9a7a84; --border:#ddd0d4; --success:#1a7a42; --success-bg:#edfaf3; --error:#c0182e; --error-bg:#fff0f2; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--cream); color:var(--text); font-family:"DM Sans",sans-serif; min-height:100vh; }
+
+  .header { background:var(--maroon); padding:13px 18px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(122,12,46,0.3); }
+  .header-title { color:#fff; font-size:16px; font-weight:900; }
+  .header-store { background:var(--gold); color:var(--maroon-dark); font-family:"Space Mono",monospace; font-size:11px; font-weight:700; padding:5px 12px; border-radius:20px; }
+
+  .loading-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:80vh; padding:24px; text-align:center; }
+  .spinner { width:48px; height:48px; border:4px solid var(--border); border-top-color:var(--maroon); border-radius:50%; animation:spin 0.8s linear infinite; margin-bottom:20px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .loading-title { font-size:18px; font-weight:900; color:var(--maroon); margin-bottom:6px; }
+  .loading-sub { font-size:13px; color:var(--muted); }
+  .load-err { color:var(--error); font-weight:700; }
+
+  .wrap { max-width:460px; margin:0 auto; padding:14px 14px 100px; }
+
+  .camera-card { background:var(--white); border-radius:14px; border:2px solid var(--border); margin-bottom:14px; overflow:hidden; }
+  .camera-inner { padding:14px; }
+  .scanner-wrap { position:relative; width:100%; border-radius:10px; overflow:hidden; background:#000; display:none; margin-bottom:10px; }
+  #qr-reader { border:none!important; padding:0!important; width:100%!important; }
+  #qr-reader video { width:100%!important; height:100%!important; object-fit:cover!important; border-radius:0!important; }
+  #qr-reader img,.qr-reader__dashboard { display:none!important; }
+  #qr-reader__scan_region { padding:0!important; }
+  #qr-reader__dashboard { display:none!important; }
+  .scan-overlay { position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+  .scan-frame { width:78%; height:32%; position:relative; }
+  .scan-frame::before,.scan-frame::after,.scan-frame span::before,.scan-frame span::after { content:""; position:absolute; width:22px; height:22px; border-color:var(--gold); border-style:solid; }
+  .scan-frame::before  { top:0;left:0;   border-width:3px 0 0 3px; border-radius:3px 0 0 0; }
+  .scan-frame::after   { top:0;right:0;  border-width:3px 3px 0 0; border-radius:0 3px 0 0; }
+  .scan-frame span::before { bottom:0;left:0;  border-width:0 0 3px 3px; border-radius:0 0 0 3px; }
+  .scan-frame span::after  { bottom:0;right:0; border-width:0 3px 3px 0; border-radius:0 0 3px 0; }
+  .scan-line { position:absolute; left:4%; right:4%; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); animation:scanline 2s ease-in-out infinite; }
+  @keyframes scanline { 0%{top:4%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:96%;opacity:0} }
+  .btn-cam-start { display:block; width:100%; padding:18px; border-radius:10px; border:none; background:var(--maroon); color:#fff; font-family:"DM Sans",sans-serif; font-weight:900; font-size:17px; cursor:pointer; }
+  .btn-cam-stop  { display:none;  width:100%; padding:18px; border-radius:10px; border:none; background:var(--error);  color:#fff; font-family:"DM Sans",sans-serif; font-weight:900; font-size:17px; cursor:pointer; }
+  .scan-hint { text-align:center; font-size:13px; font-weight:700; color:var(--muted); padding:8px 0 0; animation:hintBlink 1.4s ease-in-out infinite; }
+  @keyframes hintBlink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* RESULT CARD */
+  .result-card { border-radius:16px; padding:20px; display:none; border:2px solid transparent; animation:popIn 0.22s cubic-bezier(0.175,0.885,0.32,1.275); margin-bottom:14px; background:var(--white); border-color:var(--border); }
+  .result-card.show { display:block; }
+  .result-card.miss { background:var(--error-bg); border-color:#f5b8c0; }
+  @keyframes popIn { from{transform:scale(0.93) translateY(6px);opacity:0} to{transform:scale(1);opacity:1} }
+
+  .result-scanned { font-family:"Space Mono",monospace; font-size:11px; color:var(--muted); margin-bottom:8px; }
+  .result-brand   { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:3px; }
+  .result-desc    { font-size:18px; font-weight:900; color:var(--maroon); margin-bottom:12px; line-height:1.2; }
+  .pills { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+  .pill-wrap {}
+  .pill-label { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; font-family:"Space Mono",monospace; color:var(--muted); margin-bottom:2px; }
+  .pill { padding:8px 12px; border-radius:8px; font-size:14px; font-weight:700; }
+  .pill.dept { background:#f5eaee; border:1.5px solid #ddb0bc; color:var(--maroon); }
+  .pill.cat  { background:#fffbee; border:1.5px solid var(--gold); color:#7a5a00; }
+  .pill.sub  { background:var(--success-bg); border:1.5px solid #a8e6c3; color:var(--success); }
+
+  /* AISLE + REMARK */
+  .inputs-row { display:flex; gap:10px; margin-bottom:14px; }
+  .inp-wrap { flex:1; }
+  .inp-label { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; font-family:"Space Mono",monospace; color:var(--muted); margin-bottom:4px; display:block; }
+  .inp { width:100%; padding:10px 12px; border-radius:10px; border:2px solid var(--border); background:var(--cream); font-family:"DM Sans",sans-serif; font-size:14px; font-weight:600; color:var(--text); outline:none; appearance:none; }
+  .inp:focus { border-color:var(--maroon); }
+
+  /* TYPE BUTTONS */
+  .type-label { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; font-family:"Space Mono",monospace; color:var(--muted); margin-bottom:6px; }
+  .type-row { display:flex; gap:10px; margin-bottom:14px; }
+  .btn-type { flex:1; padding:16px; border-radius:12px; border:2px solid var(--border); background:var(--white); color:var(--text); font-family:"DM Sans",sans-serif; font-weight:900; font-size:15px; cursor:pointer; transition:all 0.15s; }
+  .btn-type:active, .btn-type.pressed { background:var(--maroon); color:#fff; border-color:var(--maroon); }
+  .btn-type.loading { opacity:0.6; pointer-events:none; }
+
+  /* LABEL FEEDBACK */
+  .label-feedback { text-align:center; padding:10px; border-radius:10px; background:var(--success-bg); border:1.5px solid #a8e6c3; margin-bottom:14px; display:none; }
+  .label-feedback.show { display:block; }
+  .label-num { font-size:32px; font-weight:900; color:var(--maroon); font-family:"Space Mono",monospace; }
+  .label-txt { font-size:12px; color:var(--muted); font-family:"Space Mono",monospace; }
+
+  /* PHOTO */
+  .btn-photo { display:block; width:100%; padding:14px; border-radius:12px; border:2px solid var(--maroon); background:var(--white); color:var(--maroon); font-family:"DM Sans",sans-serif; font-weight:700; font-size:15px; cursor:pointer; margin-bottom:10px; }
+  .btn-next  { display:block; width:100%; padding:14px; border-radius:12px; border:none; background:var(--maroon); color:#fff; font-family:"DM Sans",sans-serif; font-weight:700; font-size:15px; cursor:pointer; }
+
+  .not-found-title { font-size:20px; font-weight:900; color:var(--error); margin-bottom:4px; }
+  .not-found-sub   { font-size:13px; color:var(--muted); margin-bottom:14px; }
+
+  /* PHOTO OVERLAY */
+  .photo-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:200; display:none; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
+  .photo-overlay.show { display:flex; }
+  .photo-video-wrap { width:100%; max-width:420px; border-radius:14px; overflow:hidden; }
+  #photo-video { width:100%; display:block; }
+  .photo-fname { font-family:"Space Mono",monospace; font-size:11px; color:#fff; opacity:0.75; text-align:center; margin:12px 0 16px; word-break:break-all; }
+  .photo-btn-row { display:flex; gap:10px; width:100%; max-width:420px; }
+  .btn-capture { flex:1; padding:16px; border-radius:12px; border:none; background:var(--gold); color:var(--maroon-dark); font-family:"DM Sans",sans-serif; font-weight:900; font-size:16px; cursor:pointer; }
+  .btn-cancel  { flex:1; padding:16px; border-radius:12px; border:none; background:rgba(255,255,255,0.15); color:#fff; font-family:"DM Sans",sans-serif; font-weight:700; font-size:16px; cursor:pointer; }
+
+  .status-bar { background:var(--white); border-top:1px solid var(--border); padding:8px 18px; display:flex; justify-content:space-between; font-size:11px; color:var(--muted); font-family:"Space Mono",monospace; position:fixed; bottom:0; left:0; right:0; z-index:80; }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#ccc; margin-right:5px; vertical-align:middle; }
+  .dot.on   { background:var(--gold);    animation:pulse 1.5s infinite; }
+  .dot.ok   { background:var(--success); }
+  .dot.load { background:var(--maroon);  animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .toast { position:fixed; bottom:52px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--maroon); color:#fff; padding:11px 24px; border-radius:30px; font-weight:700; font-size:13px; z-index:999; transition:transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275); white-space:nowrap; pointer-events:none; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+  .toast.ok  { background:var(--success); }
+  .toast.err { background:var(--error); }
+  #photo-canvas { display:none; }
+  #photo-input  { display:none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">Label Scanner</div>
+  <div class="header-store">WBL</div>
+</div>
+
+<!-- Loading -->
+<div id="loading-screen" class="loading-screen">
+  <div class="spinner"></div>
+  <div class="loading-title">Loading product data…</div>
+  <div class="loading-sub" id="load-sub">Fetching 154k products</div>
+</div>
+
+<!-- Main -->
+<div id="main" style="display:none">
+  <div class="wrap">
+
+    <!-- Scanner -->
+    <div class="camera-card">
+      <div class="camera-inner">
+        <div class="scanner-wrap" id="scanner-wrap">
+          <div id="qr-reader"></div>
+          <div class="scan-overlay"><div class="scan-frame"><span></span><div class="scan-line"></div></div></div>
+        </div>
+        <button class="btn-cam-start" id="btn-start-cam" onclick="startScanner()">▶  Start Camera</button>
+        <button class="btn-cam-stop"  id="btn-stop-cam"  onclick="stopScanner()">■  Stop Camera</button>
+        <div class="scan-hint" id="scan-hint">Tap above to start scanning</div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="result-card" id="result-card"></div>
+
+  </div>
+</div>
+
+<!-- Photo overlay -->
+<div class="photo-overlay" id="photo-overlay">
+  <div class="photo-video-wrap">
+    <video id="photo-video" autoplay playsinline></video>
+  </div>
+  <canvas id="photo-canvas"></canvas>
+  <div class="photo-fname" id="photo-fname"></div>
+  <div class="photo-btn-row">
+    <button class="btn-cancel"  onclick="closePhotoCamera()">✕ Cancel</button>
+    <button class="btn-capture" onclick="capturePhoto()">📸 Capture</button>
+  </div>
+</div>
+<input type="file" id="photo-input" accept="image/*" capture="environment" onchange="handlePhotoInput(this)">
+
+<div class="status-bar">
+  <span><span class="dot" id="dot"></span><span id="status-txt">Loading…</span></span>
+  <span id="prod-count"></span>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzGgrWWaJLCrN0uyinIorQy94-dGXN4YrDtio0uUP6pMoD6cU7on1XsKl_X_DZ48Ny5/exec';
+const STORE = 'WBL';
+
+let products = {};
+let html5QrCode = null, scannerOn = false;
+let lastScanned = '', lastScanTime = 0;
+let currentProduct = null;
+let photoStream = null;
+let photoCounters = {};
+
+// ── LOAD DATA ─────────────────────────────────────────────────
+async function loadData() {
+  try {
+    setStatus('load','Loading…');
+    const resp = await fetch('uofm_data.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    products = await resp.json();
+    const count = Object.keys(products).length;
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    document.getElementById('prod-count').textContent = count.toLocaleString() + ' products';
+    setStatus('ok','Ready');
+    showToast(count.toLocaleString() + ' products loaded','ok');
+  } catch(err) {
+    document.getElementById('load-sub').innerHTML = '<span class="load-err">Failed: ' + err.message + '</span>';
+    setStatus('','Error');
+  }
+}
+
+// ── LOOKUP ────────────────────────────────────────────────────
+function lookup(raw) {
+  const c  = String(raw).replace(/[\s\-]/g,'');
+  const s  = c.replace(/^0+/,'') || c;
+  const variants = [c, s, c.padStart(13,'0'), c.padStart(12,'0'), s.slice(0,-1), c.slice(0,-1)];
+  for (const v of variants) {
+    if (!v) continue;
+    if (products[v]) return products[v];
+    const vs = v.replace(/^0+/,'');
+    for (const [key,p] of Object.entries(products)) {
+      if (key.replace(/^0+/,'') === vs) return p;
+    }
+  }
+  return null;
+}
+
+// ── SCANNER ───────────────────────────────────────────────────
+function startScanner() {
+  document.getElementById('scanner-wrap').style.display  = 'block';
+  document.getElementById('btn-start-cam').style.display = 'none';
+  document.getElementById('btn-stop-cam').style.display  = 'block';
+  document.getElementById('scan-hint').style.display     = 'none';
+  setStatus('on','Scanning…');
+  html5QrCode = new Html5Qrcode('qr-reader');
+  html5QrCode.start(
+    {facingMode:'environment'},
+    {fps:15, qrbox:{width:280,height:120},
+     formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.ITF]},
+    decodedText => {
+      const now = Date.now();
+      if (decodedText === lastScanned && now - lastScanTime < 4000) return;
+      lastScanned = decodedText; lastScanTime = now;
+      showResult(decodedText);
+    }, ()=>{}
+  ).catch(()=>{ showToast('Camera error','err'); stopScanner(); });
+  scannerOn = true;
+}
+
+function stopScanner() {
+  if (html5QrCode && scannerOn) {
+    html5QrCode.stop().then(()=>{ html5QrCode.clear(); html5QrCode=null; }).catch(()=>{});
+    scannerOn = false;
+  }
+  document.getElementById('scanner-wrap').style.display  = 'none';
+  document.getElementById('btn-start-cam').style.display = 'block';
+  document.getElementById('btn-stop-cam').style.display  = 'none';
+  document.getElementById('scan-hint').style.display     = 'block';
+  setStatus('ok','Ready');
+}
+
+// ── RESULT ────────────────────────────────────────────────────
+function showResult(rawCode) {
+  const card  = document.getElementById('result-card');
+  const found = lookup(rawCode);
+  currentProduct = found;
+
+  if (!found) {
+    card.innerHTML = `
+      <div class="result-scanned">Scanned: ${rawCode}</div>
+      <div class="not-found-title">🚫 Not Found</div>
+      <div class="not-found-sub">Not in database.</div>
+      <button class="btn-next" onclick="scanNext()">▶ Scan Next</button>`;
+    card.className = 'result-card show miss';
+    showToast('Not found','err');
+    return;
+  }
+
+  card.innerHTML = `
+    <div class="result-scanned">Scanned: ${rawCode}</div>
+    <div class="result-brand">${found.brand}</div>
+    <div class="result-desc">${found.desc}</div>
+    <div class="pills">
+      <div class="pill-wrap">
+        <div class="pill-label">Dept</div>
+        <div class="pill dept">${found.dept}</div>
+      </div>
+      <div class="pill-wrap">
+        <div class="pill-label">Category</div>
+        <div class="pill cat">${found.cat}</div>
+      </div>
+      <div class="pill-wrap">
+        <div class="pill-label">Subcategory</div>
+        <div class="pill sub">${found.sub}</div>
+      </div>
+    </div>
+
+    <div class="inputs-row">
+      <div class="inp-wrap">
+        <label class="inp-label">Aisle</label>
+        <select class="inp" id="inp-aisle">
+          <option value="">—</option>
+          ${[...Array(13)].map((_,i)=>`<option value="${i+1}">${i+1}</option>`).join('')}
+        </select>
+      </div>
+      <div class="inp-wrap" style="flex:2">
+        <label class="inp-label">Remark</label>
+        <input class="inp" id="inp-remark" type="text" placeholder="optional…">
+      </div>
+    </div>
+
+    <div class="type-label">Select sign type to record:</div>
+    <div class="type-row">
+      <button class="btn-type" id="btn-sticker"  onclick="pressType('Sticker')">🏷 Sticker</button>
+      <button class="btn-type" id="btn-fourup"   onclick="pressType('Four-up')">📋 Four-up</button>
+    </div>
+
+    <div class="label-feedback" id="label-feedback">
+      <div class="label-num" id="label-num">—</div>
+      <div class="label-txt" id="label-txt">labels recorded</div>
+    </div>
+
+    <button class="btn-photo" onclick="openPhotoCamera()">📷 Take Photo</button>
+    <button class="btn-next"  onclick="scanNext()">▶ Scan Next</button>`;
+
+  card.className = 'result-card show';
+  showToast(found.cat,'ok');
+}
+
+// ── PRESS TYPE (STICKER / FOUR-UP) ───────────────────────────
+async function pressType(type) {
+  if (!currentProduct) return;
+
+  const btnId = type === 'Sticker' ? 'btn-sticker' : 'btn-fourup';
+  const btn   = document.getElementById(btnId);
+  btn.classList.add('loading');
+  btn.textContent = '⏳ Saving…';
+
+  const aisle  = document.getElementById('inp-aisle')?.value  || '';
+  const remark = document.getElementById('inp-remark')?.value || '';
+
+  try {
+    const resp = await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action:      'updateSheet',
+        store:        STORE,
+        dept:         currentProduct.dept,
+        category:     currentProduct.cat,
+        subcategory:  currentProduct.sub,
+        type,
+        aisle,
+        remark
+      })
+    });
+    const result = await resp.json();
+
+    if (result.error) {
+      showToast('Error: ' + result.error, 'err');
+    } else {
+      // Show label counter feedback
+      const fb = document.getElementById('label-feedback');
+      document.getElementById('label-num').textContent = result.label;
+      document.getElementById('label-txt').textContent = type + ' labels recorded';
+      fb.classList.add('show');
+      showToast('Label ' + result.label + ' saved (' + type + ')','ok');
+    }
+  } catch(err) {
+    showToast('Network error','err');
+  }
+
+  btn.classList.remove('loading');
+  btn.textContent = type === 'Sticker' ? '🏷 Sticker' : '📋 Four-up';
+  btn.classList.add('pressed');
+}
+
+// ── PHOTO FILENAME ────────────────────────────────────────────
+function buildFilename(p) {
+  const clean = s => String(s).trim().replace(/[\/\\:*?"<>|]/g,'').replace(/\s+/g,'_');
+  const base  = STORE + '_' + clean(p.dept) + '_' + clean(p.cat) + '_' + clean(p.sub);
+  photoCounters[base] = (photoCounters[base] || 0) + 1;
+  return base + (photoCounters[base] > 1 ? '_' + photoCounters[base] : '') + '.jpg';
+}
+
+// ── PHOTO CAMERA ──────────────────────────────────────────────
+async function openPhotoCamera() {
+  if (!currentProduct) return;
+  document.getElementById('photo-fname').textContent = buildFilename(currentProduct);
+  // undo counter increment (it'll re-increment on actual capture)
+  const base = STORE + '_' + currentProduct.dept.replace(/\s+/g,'_') + '_' + currentProduct.cat.replace(/\s+/g,'_') + '_' + currentProduct.sub.replace(/\s+/g,'_');
+  photoCounters[base] = Math.max(0, (photoCounters[base] || 1) - 1);
+
+  try {
+    photoStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:{ideal:'environment'}, width:{ideal:1920}, height:{ideal:1080} }
+    });
+    document.getElementById('photo-video').srcObject = photoStream;
+    document.getElementById('photo-overlay').classList.add('show');
+  } catch(err) {
+    document.getElementById('photo-input').click();
+  }
+}
+
+function closePhotoCamera() {
+  if (photoStream) { photoStream.getTracks().forEach(t=>t.stop()); photoStream=null; }
+  document.getElementById('photo-overlay').classList.remove('show');
+}
+
+async function capturePhoto() {
+  if (!currentProduct) return;
+  const video  = document.getElementById('photo-video');
+  const canvas = document.getElementById('photo-canvas');
+  canvas.width  = video.videoWidth  || 1280;
+  canvas.height = video.videoHeight || 720;
+  canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
+
+  const fname = buildFilename(currentProduct);
+  document.getElementById('photo-fname').textContent = fname;
+
+  canvas.toBlob(async blob => {
+    // Convert to base64 and upload to Drive
+    const reader = new FileReader();
+    reader.onload = async e => {
+      const base64 = e.target.result.split(',')[1];
+      try {
+        const resp = await fetch(SCRIPT_URL, {
+          method:'POST',
+          body: JSON.stringify({
+            action:'uploadPhoto',
+            store: STORE,
+            filename: fname,
+            imageBase64: base64,
+            mimeType:'image/jpeg'
+          })
+        });
+        const result = await resp.json();
+        if (result.error) showToast('Upload error: ' + result.error,'err');
+        else showToast('📸 Saved: ' + fname,'ok');
+      } catch(err) { showToast('Upload failed','err'); }
+    };
+    reader.readAsDataURL(blob);
+  }, 'image/jpeg', 0.92);
+
+  closePhotoCamera();
+}
+
+function handlePhotoInput(input) {
+  if (!input.files[0] || !currentProduct) return;
+  const fname  = buildFilename(currentProduct);
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const base64 = e.target.result.split(',')[1];
+    try {
+      const resp = await fetch(SCRIPT_URL, {
+        method:'POST',
+        body: JSON.stringify({ action:'uploadPhoto', store:STORE, filename:fname, imageBase64:base64, mimeType:'image/jpeg' })
+      });
+      const result = await resp.json();
+      if (result.error) showToast('Upload error: '+result.error,'err');
+      else showToast('📸 Saved: '+fname,'ok');
+    } catch(err) { showToast('Upload failed','err'); }
+  };
+  reader.readAsDataURL(input.files[0]);
+  input.value='';
+}
+
+function scanNext() {
+  document.getElementById('result-card').className='result-card';
+  document.getElementById('result-card').innerHTML='';
+  lastScanned=''; currentProduct=null;
+  if (!scannerOn) startScanner();
+}
+
+function setStatus(s,t) { document.getElementById('status-txt').textContent=t; document.getElementById('dot').className='dot'+(s?' '+s:''); }
+function showToast(msg,type) { const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(type?' '+type:''); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800); }
+
+loadData();
+</script>
+</body>
+</html>
