@@ -179,6 +179,7 @@ let products = {};
 let html5QrCode = null, scannerOn = false;
 let lastScanned = '', lastScanTime = 0;
 let currentProduct = null;
+let currentType = '';
 let photoStream = null;
 let photoCounters = {};
 
@@ -305,6 +306,7 @@ function showResult(rawCode) {
     <div class="type-row">
       <button class="btn-type" id="btn-sticker"  onclick="pressType('Sticker')">🏷 Sticker</button>
       <button class="btn-type" id="btn-fourup"   onclick="pressType('Four-up')">📋 Four-up</button>
+      <button class="btn-type" id="btn-none"     onclick="pressType('None')">✕ None</button>
     </div>
 
     <div class="label-feedback" id="label-feedback">
@@ -319,57 +321,63 @@ function showResult(rawCode) {
   showToast(found.cat,'ok');
 }
 
-// ── PRESS TYPE (STICKER / FOUR-UP) ───────────────────────────
+// ── PRESS TYPE (STICKER / FOUR-UP / NONE) ────────────────────
 async function pressType(type) {
   if (!currentProduct) return;
+  currentType = type;
 
-  const btnId = type === 'Sticker' ? 'btn-sticker' : 'btn-fourup';
+  const btnId = type === 'Sticker' ? 'btn-sticker' : type === 'Four-up' ? 'btn-fourup' : 'btn-none';
   const btn   = document.getElementById(btnId);
   btn.classList.add('loading');
   btn.textContent = '⏳ Saving…';
 
   const aisle  = document.getElementById('inp-aisle')?.value  || '';
   const remark = document.getElementById('inp-remark')?.value || '';
+  currentProduct._aisle  = aisle;
+  currentProduct._remark = remark;
 
   try {
     const resp = await fetch(SCRIPT_URL, {
       method: 'POST',
       body: JSON.stringify({
-        action:      'updateSheet',
-        store:        STORE,
-        dept:         currentProduct.dept,
-        category:     currentProduct.cat,
-        subcategory:  currentProduct.sub,
-        type,
-        aisle,
-        remark
+        action:    'updateSheet',
+        store:      STORE,
+        dept:       currentProduct.dept,
+        category:   currentProduct.cat,
+        subcategory:currentProduct.sub,
+        type, aisle, remark,
+        noneOnly:   type === 'None'
       })
     });
     const result = await resp.json();
-
     if (result.error) {
       showToast('Error: ' + result.error, 'err');
     } else {
-      // Show label counter feedback
       const fb = document.getElementById('label-feedback');
-      document.getElementById('label-num').textContent = result.label;
-      document.getElementById('label-txt').textContent = type + ' labels recorded';
+      if (type === 'None') {
+        document.getElementById('label-num').textContent = '—';
+        document.getElementById('label-txt').textContent = 'Aisle/Remark saved';
+      } else {
+        document.getElementById('label-num').textContent = result.label;
+        document.getElementById('label-txt').textContent = type + ' labels recorded';
+      }
       fb.classList.add('show');
-      showToast('Label ' + result.label + ' saved (' + type + ')','ok');
+      showToast(type === 'None' ? 'Saved aisle/remark' : 'Label ' + result.label + ' (' + type + ')','ok');
     }
   } catch(err) {
     showToast('Network error','err');
   }
 
   btn.classList.remove('loading');
-  btn.textContent = type === 'Sticker' ? '🏷 Sticker' : '📋 Four-up';
+  btn.textContent = type === 'Sticker' ? '🏷 Sticker' : type === 'Four-up' ? '📋 Four-up' : '✕ None';
   btn.classList.add('pressed');
 }
 
 // ── PHOTO FILENAME ────────────────────────────────────────────
-function buildFilename(p) {
+function buildFilename(p, type) {
   const clean = s => String(s).trim().replace(/[\/\\:*?"<>|]/g,'').replace(/\s+/g,'_');
-  const base  = STORE + '_' + clean(p.dept) + '_' + clean(p.cat) + '_' + clean(p.sub);
+  const t     = (type || currentType || 'Unknown').replace(/[\s\-]/g,'_');
+  const base  = STORE + '_' + clean(p.dept) + '_' + clean(p.cat) + '_' + clean(p.sub) + '_' + t;
   photoCounters[base] = (photoCounters[base] || 0) + 1;
   return base + (photoCounters[base] > 1 ? '_' + photoCounters[base] : '') + '.jpg';
 }
@@ -377,10 +385,13 @@ function buildFilename(p) {
 // ── PHOTO CAMERA ──────────────────────────────────────────────
 async function openPhotoCamera() {
   if (!currentProduct) return;
-  document.getElementById('photo-fname').textContent = buildFilename(currentProduct);
-  // undo counter increment (it'll re-increment on actual capture)
-  const base = STORE + '_' + currentProduct.dept.replace(/\s+/g,'_') + '_' + currentProduct.cat.replace(/\s+/g,'_') + '_' + currentProduct.sub.replace(/\s+/g,'_');
-  photoCounters[base] = Math.max(0, (photoCounters[base] || 1) - 1);
+  const t    = currentType || 'Unknown';
+  const clean= s => String(s).trim().replace(/[\/\\:*?"<>|]/g,'').replace(/\s+/g,'_');
+  const base = STORE+'_'+clean(currentProduct.dept)+'_'+clean(currentProduct.cat)+'_'+clean(currentProduct.sub)+'_'+t.replace(/[\s\-]/g,'_');
+  // Preview filename without incrementing yet
+  const previewNum = (photoCounters[base] || 0) + 1;
+  const previewName= base + (previewNum > 1 ? '_'+previewNum : '') + '.jpg';
+  document.getElementById('photo-fname').textContent = previewName;
 
   try {
     photoStream = await navigator.mediaDevices.getUserMedia({
@@ -459,7 +470,7 @@ function handlePhotoInput(input) {
 function scanNext() {
   document.getElementById('result-card').className='result-card';
   document.getElementById('result-card').innerHTML='';
-  lastScanned=''; currentProduct=null;
+  lastScanned=''; currentProduct=null; currentType='';
   if (!scannerOn) startScanner();
 }
 
