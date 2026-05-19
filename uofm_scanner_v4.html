@@ -342,7 +342,7 @@ function stopScanner() {
 }
 
 // ── RESULT ────────────────────────────────────────────────────
-function showResult(rawCode) {
+async function showResult(rawCode) {
   const card  = document.getElementById('result-card');
   const found = lookup(rawCode);
   currentProduct = found;
@@ -359,6 +359,38 @@ function showResult(rawCode) {
     return;
   }
 
+  // Render card with loading counts first
+  renderResultCard(rawCode, found, { fourup:0, sticker:0, orchi:0, aisle:'', remark:'' }, true);
+
+  // Fetch current counts from sheet
+  try {
+    const resp = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({
+      action:'getRow', store:currentStore,
+      dept:found.dept, category:found.cat, subcategory:found.sub
+    })});
+    const row = await resp.json();
+    if (!row.error) {
+      currentCounts = { fourup: row.fourup, sticker: row.sticker, orchi: row.orchi };
+      // Update counters in UI
+      const ef = document.getElementById('count-fourup');
+      const es = document.getElementById('count-sticker');
+      const eo = document.getElementById('count-orchi');
+      if (ef) ef.textContent = row.fourup;
+      if (es) es.textContent = row.sticker;
+      if (eo) eo.textContent = row.orchi;
+      // Pre-fill aisle/remark if already in sheet
+      const ia = document.getElementById('inp-aisle');
+      const ir = document.getElementById('inp-remark');
+      if (ia && row.aisle)  ia.value = row.aisle;
+      if (ir && row.remark) ir.value = row.remark;
+    }
+  } catch(e) { /* silently fail — counts just stay at 0 */ }
+
+  showToast(found.cat,'ok');
+}
+
+function renderResultCard(rawCode, found, counts, loading) {
+  const card = document.getElementById('result-card');
   card.innerHTML = `
     <div class="result-scanned">Scanned: ${rawCode}</div>
     <div class="result-brand">${found.brand}</div>
@@ -388,17 +420,17 @@ function showResult(rawCode) {
       <button class="btn-action fourup"  onclick="pressAction('fourup')">
         <span class="btn-icon">📋</span>
         <span>Four-up</span>
-        <span class="btn-count" id="count-fourup">0</span>
+        <span class="btn-count" id="count-fourup">${loading ? '…' : counts.fourup}</span>
       </button>
       <button class="btn-action sticker" onclick="pressAction('sticker')">
         <span class="btn-icon">🏷</span>
         <span>Sticker</span>
-        <span class="btn-count" id="count-sticker">0</span>
+        <span class="btn-count" id="count-sticker">${loading ? '…' : counts.sticker}</span>
       </button>
       <button class="btn-action orchi"   onclick="pressAction('orchi')">
         <span class="btn-icon">➕</span>
         <span>I Added</span>
-        <span class="btn-count" id="count-orchi">0</span>
+        <span class="btn-count" id="count-orchi">${loading ? '…' : counts.orchi}</span>
       </button>
       <button class="btn-action none"    onclick="pressAction('none')">
         <span class="btn-icon">✕</span>
@@ -411,9 +443,7 @@ function showResult(rawCode) {
       <button class="btn-photo" onclick="openPhotoCamera()">📷 Photo</button>
       <button class="btn-next"  onclick="scanNext()">▶ Next</button>
     </div>`;
-
   card.className = 'result-card show';
-  showToast(found.cat,'ok');
 }
 
 // ── PRESS ACTION ──────────────────────────────────────────────
