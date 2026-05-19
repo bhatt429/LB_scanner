@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Label Scanner</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@400;600;700;900&display=swap');
+  :root { --maroon:#7A0C2E; --maroon-dark:#5a0920; --gold:#F0B722; --cream:#F5F0E8; --white:#fff; --text:#1a0a10; --muted:#9a7a84; --border:#ddd0d4; --success:#1a7a42; --success-bg:#edfaf3; --error:#c0182e; --error-bg:#fff0f2; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--cream); color:var(--text); font-family:"DM Sans",sans-serif; min-height:100vh; }
+
+  /* HEADER */
+  .header { background:var(--maroon); padding:13px 18px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(122,12,46,0.3); }
+  .header-title { color:#fff; font-size:16px; font-weight:900; }
+  .header-right { display:flex; align-items:center; gap:8px; }
+  .store-badge { background:var(--gold); color:var(--maroon-dark); font-family:"Space Mono",monospace; font-size:12px; font-weight:700; padding:5px 12px; border-radius:20px; cursor:pointer; }
+
+  /* PAGES */
+  .page { display:none; } .page.active { display:block; }
+
+  /* SETUP PAGE */
+  .setup-wrap { padding:24px 20px; max-width:460px; margin:0 auto; }
+  .setup-card { background:var(--white); border-radius:18px; padding:32px 26px; box-shadow:0 2px 16px rgba(122,12,46,0.1); margin-top:16px; }
+  .logo { text-align:center; margin-bottom:28px; }
+  .logo-title { font-size:26px; font-weight:900; color:var(--maroon); }
+  .logo-sub { font-size:13px; color:var(--muted); margin-top:4px; }
+  .field-wrap { margin-bottom:18px; }
+  .field-label { display:block; font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:7px; font-family:"Space Mono",monospace; }
+  .field-input { width:100%; padding:13px 15px; border-radius:12px; border:2px solid var(--border); background:var(--cream); color:var(--text); font-family:"DM Sans",sans-serif; font-size:15px; outline:none; appearance:none; }
+  .field-input:focus { border-color:var(--maroon); }
+  .btn-primary { display:block; width:100%; padding:16px; border-radius:12px; border:none; background:var(--maroon); color:#fff; font-family:"DM Sans",sans-serif; font-weight:700; font-size:16px; cursor:pointer; }
+
+  /* LOADING */
+  .loading-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:60vh; text-align:center; padding:24px; }
+  .spinner { width:44px; height:44px; border:4px solid var(--border); border-top-color:var(--maroon); border-radius:50%; animation:spin 0.8s linear infinite; margin-bottom:16px; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+  .load-title { font-size:17px; font-weight:900; color:var(--maroon); margin-bottom:4px; }
+  .load-sub { font-size:13px; color:var(--muted); }
+  .load-err { color:var(--error); font-weight:700; }
+
+  /* SCANNER PAGE */
+  .scan-wrap { max-width:460px; margin:0 auto; padding:14px 14px 100px; }
+
+  /* Store bar */
+  .store-bar { background:var(--white); border-radius:12px; padding:10px 14px; margin-bottom:12px; border:2px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+  .store-bar-name { font-size:15px; font-weight:900; color:var(--maroon); }
+  .store-bar-sub { font-size:11px; color:var(--muted); font-family:"Space Mono",monospace; }
+  .btn-change { font-size:11px; font-weight:700; color:var(--maroon); background:none; border:1.5px solid var(--border); padding:5px 10px; border-radius:8px; cursor:pointer; }
+
+  /* Camera */
+  .camera-card { background:var(--white); border-radius:14px; border:2px solid var(--border); margin-bottom:12px; overflow:hidden; }
+  .camera-inner { padding:14px; }
+  .scanner-wrap { position:relative; width:100%; border-radius:10px; overflow:hidden; background:#000; display:none; margin-bottom:10px; }
+  #qr-reader { border:none!important; padding:0!important; width:100%!important; }
+  #qr-reader video { width:100%!important; height:100%!important; object-fit:cover!important; border-radius:0!important; }
+  #qr-reader img { display:none!important; } #qr-reader__scan_region { padding:0!important; } #qr-reader__dashboard { display:none!important; }
+  .scan-overlay { position:absolute; inset:0; pointer-events:none; display:flex; align-items:center; justify-content:center; }
+  .scan-frame { width:78%; height:32%; position:relative; }
+  .scan-frame::before,.scan-frame::after,.scan-frame span::before,.scan-frame span::after { content:""; position:absolute; width:22px; height:22px; border-color:var(--gold); border-style:solid; }
+  .scan-frame::before  { top:0;left:0;   border-width:3px 0 0 3px; border-radius:3px 0 0 0; }
+  .scan-frame::after   { top:0;right:0;  border-width:3px 3px 0 0; border-radius:0 3px 0 0; }
+  .scan-frame span::before { bottom:0;left:0;  border-width:0 0 3px 3px; border-radius:0 0 0 3px; }
+  .scan-frame span::after  { bottom:0;right:0; border-width:0 3px 3px 0; border-radius:0 0 3px 0; }
+  .scan-line { position:absolute; left:4%; right:4%; height:2px; background:linear-gradient(90deg,transparent,var(--gold),transparent); animation:scanline 2s ease-in-out infinite; }
+  @keyframes scanline { 0%{top:4%;opacity:0} 10%{opacity:1} 90%{opacity:1} 100%{top:96%;opacity:0} }
+  .btn-cam-start { display:block; width:100%; padding:16px; border-radius:10px; border:none; background:var(--maroon); color:#fff; font-family:"DM Sans",sans-serif; font-weight:900; font-size:16px; cursor:pointer; }
+  .btn-cam-stop  { display:none;  width:100%; padding:16px; border-radius:10px; border:none; background:var(--error);  color:#fff; font-family:"DM Sans",sans-serif; font-weight:900; font-size:16px; cursor:pointer; }
+  .scan-hint { text-align:center; font-size:13px; font-weight:700; color:var(--muted); padding:7px 0 0; animation:hintBlink 1.4s ease-in-out infinite; }
+  @keyframes hintBlink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Result card */
+  .result-card { border-radius:16px; padding:18px; display:none; border:2px solid var(--border); background:var(--white); animation:popIn 0.22s cubic-bezier(0.175,0.885,0.32,1.275); margin-bottom:12px; }
+  .result-card.show { display:block; }
+  .result-card.miss { background:var(--error-bg); border-color:#f5b8c0; }
+  @keyframes popIn { from{transform:scale(0.93) translateY(6px);opacity:0} to{transform:scale(1);opacity:1} }
+
+  .result-scanned { font-family:"Space Mono",monospace; font-size:11px; color:var(--muted); margin-bottom:8px; }
+  .result-brand   { font-size:12px; color:var(--muted); font-weight:600; margin-bottom:3px; }
+  .result-desc    { font-size:17px; font-weight:900; color:var(--maroon); margin-bottom:12px; line-height:1.2; }
+
+  .pills { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+  .pill-label { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; font-family:"Space Mono",monospace; color:var(--muted); margin-bottom:2px; }
+  .pill { padding:7px 12px; border-radius:8px; font-size:13px; font-weight:700; }
+  .pill.dept { background:#f5eaee; border:1.5px solid #ddb0bc; color:var(--maroon); }
+  .pill.cat  { background:#fffbee; border:1.5px solid var(--gold); color:#7a5a00; }
+  .pill.sub  { background:var(--success-bg); border:1.5px solid #a8e6c3; color:var(--success); }
+
+  /* Aisle + remark */
+  .inputs-row { display:flex; gap:10px; margin-bottom:14px; }
+  .inp-wrap { flex:1; }
+  .inp-label { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; font-family:"Space Mono",monospace; color:var(--muted); margin-bottom:4px; display:block; }
+  .inp { width:100%; padding:9px 11px; border-radius:9px; border:2px solid var(--border); background:var(--cream); font-family:"DM Sans",sans-serif; font-size:14px; font-weight:600; color:var(--text); outline:none; appearance:none; }
+  .inp:focus { border-color:var(--maroon); }
+
+  /* Action buttons */
+  .action-label { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; font-family:"Space Mono",monospace; color:var(--muted); margin-bottom:6px; }
+  .action-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+  .btn-action { padding:14px 8px; border-radius:12px; border:2px solid var(--border); background:var(--white); color:var(--text); font-family:"DM Sans",sans-serif; font-weight:900; font-size:13px; cursor:pointer; text-align:center; transition:all 0.15s; display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .btn-action .btn-icon { font-size:20px; }
+  .btn-action .btn-count { font-family:"Space Mono",monospace; font-size:18px; font-weight:700; color:var(--maroon); }
+  .btn-action:active { transform:scale(0.96); }
+  .btn-action.fourup  { border-color:#b0c4f0; background:#eaf0ff; }
+  .btn-action.sticker { border-color:var(--gold); background:#fffbee; }
+  .btn-action.orchi   { border-color:#a8e6c3; background:var(--success-bg); }
+  .btn-action.none    { border-color:var(--border); background:var(--cream); }
+  .btn-action.saving  { opacity:0.5; pointer-events:none; }
+
+  /* Photo + next */
+  .bottom-row { display:flex; gap:8px; }
+  .btn-photo { flex:1; padding:13px; border-radius:12px; border:2px solid var(--maroon); background:var(--white); color:var(--maroon); font-family:"DM Sans",sans-serif; font-weight:700; font-size:14px; cursor:pointer; }
+  .btn-next  { flex:1; padding:13px; border-radius:12px; border:none; background:var(--maroon); color:#fff; font-family:"DM Sans",sans-serif; font-weight:700; font-size:14px; cursor:pointer; }
+
+  .not-found-title { font-size:20px; font-weight:900; color:var(--error); margin-bottom:4px; }
+  .not-found-sub   { font-size:13px; color:var(--muted); margin-bottom:14px; }
+
+  /* Photo overlay */
+  .photo-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.88); z-index:200; display:none; flex-direction:column; align-items:center; justify-content:center; padding:20px; }
+  .photo-overlay.show { display:flex; }
+  .photo-video-wrap { width:100%; max-width:420px; border-radius:14px; overflow:hidden; }
+  #photo-video { width:100%; display:block; }
+  #photo-canvas { display:none; }
+  #photo-input  { display:none; }
+  .photo-fname { font-family:"Space Mono",monospace; font-size:11px; color:#fff; opacity:0.75; text-align:center; margin:12px 0 16px; word-break:break-all; }
+  .photo-btn-row { display:flex; gap:10px; width:100%; max-width:420px; }
+  .btn-capture { flex:1; padding:15px; border-radius:12px; border:none; background:var(--gold); color:var(--maroon-dark); font-family:"DM Sans",sans-serif; font-weight:900; font-size:16px; cursor:pointer; }
+  .btn-cancel  { flex:1; padding:15px; border-radius:12px; border:none; background:rgba(255,255,255,0.15); color:#fff; font-family:"DM Sans",sans-serif; font-weight:700; font-size:16px; cursor:pointer; }
+
+  /* Status */
+  .status-bar { background:var(--white); border-top:1px solid var(--border); padding:8px 18px; display:flex; justify-content:space-between; font-size:11px; color:var(--muted); font-family:"Space Mono",monospace; position:fixed; bottom:0; left:0; right:0; z-index:80; }
+  .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:#ccc; margin-right:5px; vertical-align:middle; }
+  .dot.on { background:var(--gold); animation:pulse 1.5s infinite; }
+  .dot.ok { background:var(--success); }
+  .dot.ld { background:var(--maroon); animation:pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .toast { position:fixed; bottom:52px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--maroon); color:#fff; padding:11px 24px; border-radius:30px; font-weight:700; font-size:13px; z-index:999; transition:transform 0.3s cubic-bezier(0.175,0.885,0.32,1.275); white-space:nowrap; pointer-events:none; }
+  .toast.show { transform:translateX(-50%) translateY(0); }
+  .toast.ok  { background:var(--success); }
+  .toast.err { background:var(--error); }
+</style>
+</head>
+<body>
+
+<div class="header" id="header" style="display:none">
+  <div class="header-title">Label Scanner</div>
+  <div class="header-right">
+    <div class="store-badge" id="header-store" onclick="goSetup()">— Store</div>
+  </div>
+</div>
+
+<!-- SETUP -->
+<div class="page active" id="page-setup">
+  <div class="setup-wrap">
+    <div class="setup-card">
+      <div class="logo">
+        <div class="logo-title">Label Scanner</div>
+        <div class="logo-sub">Scan · Count · Record</div>
+      </div>
+      <div class="field-wrap">
+        <label class="field-label">Select Store</label>
+        <select class="field-input" id="inp-store">
+          <option value="">— Select store —</option>
+          <option value="BV">BV — Burnsville</option>
+          <option value="Ch">Ch — Chanhassen</option>
+          <option value="Eg">Eg — Eagan</option>
+          <option value="GV">GV — Golden Valley</option>
+          <option value="Mg">Mg — Maple Grove</option>
+          <option value="Ply">Ply — Plymouth</option>
+          <option value="SLP">SLP — St. Louis Park</option>
+          <option value="WB">WB — White Bear Lake</option>
+          <option value="WoD">WoD — Woodbury</option>
+        </select>
+      </div>
+      <button class="btn-primary" onclick="startApp()">Start Scanning →</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="page" id="page-loading">
+  <div class="loading-screen">
+    <div class="spinner"></div>
+    <div class="load-title">Loading product data…</div>
+    <div class="load-sub" id="load-sub">Fetching 154k products</div>
+  </div>
+</div>
+
+<!-- SCANNER -->
+<div class="page" id="page-scanner">
+  <div class="scan-wrap">
+
+    <div class="store-bar">
+      <div>
+        <div class="store-bar-name" id="store-bar-name"></div>
+        <div class="store-bar-sub"  id="store-bar-sub"></div>
+      </div>
+      <button class="btn-change" onclick="goSetup()">Change</button>
+    </div>
+
+    <div class="camera-card">
+      <div class="camera-inner">
+        <div class="scanner-wrap" id="scanner-wrap">
+          <div id="qr-reader"></div>
+          <div class="scan-overlay"><div class="scan-frame"><span></span><div class="scan-line"></div></div></div>
+        </div>
+        <button class="btn-cam-start" id="btn-start-cam" onclick="startScanner()">▶  Start Camera</button>
+        <button class="btn-cam-stop"  id="btn-stop-cam"  onclick="stopScanner()">■  Stop Camera</button>
+        <div class="scan-hint" id="scan-hint">Tap above to start scanning</div>
+      </div>
+    </div>
+
+    <div class="result-card" id="result-card"></div>
+
+  </div>
+</div>
+
+<!-- PHOTO OVERLAY -->
+<div class="photo-overlay" id="photo-overlay">
+  <div class="photo-video-wrap"><video id="photo-video" autoplay playsinline></video></div>
+  <canvas id="photo-canvas"></canvas>
+  <div class="photo-fname" id="photo-fname"></div>
+  <div class="photo-btn-row">
+    <button class="btn-cancel"  onclick="closePhotoCamera()">✕ Cancel</button>
+    <button class="btn-capture" onclick="capturePhoto()">📸 Capture</button>
+  </div>
+</div>
+<input type="file" id="photo-input" accept="image/*" capture="environment" onchange="handlePhotoInput(this)">
+
+<div class="status-bar">
+  <span><span class="dot" id="dot"></span><span id="status-txt">Ready</span></span>
+  <span id="prod-count"></span>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzGgrWWaJLCrN0uyinIorQy94-dGXN4YrDtio0uUP6pMoD6cU7on1XsKl_X_DZ48Ny5/exec';
+
+let products = {};
+let currentStore = '';
+let html5QrCode = null, scannerOn = false;
+let lastScanned = '', lastScanTime = 0;
+let currentProduct = null;
+let currentCounts = { fourup:0, sticker:0, orchi:0 };
+let photoStream = null;
+let photoCounters = {};
+
+// ── STORE NAMES ───────────────────────────────────────────────
+const STORE_NAMES = {
+  BV:'Burnsville', Ch:'Chanhassen', Eg:'Eagan', GV:'Golden Valley',
+  Mg:'Maple Grove', Ply:'Plymouth', SLP:'St. Louis Park',
+  WB:'White Bear Lake', WoD:'Woodbury'
+};
+
+// ── LOAD DATA ─────────────────────────────────────────────────
+async function loadData() {
+  try {
+    setStatus('ld','Loading…');
+    const resp = await fetch('uofm_data.json');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    products = await resp.json();
+    const count = Object.keys(products).length;
+    document.getElementById('prod-count').textContent = count.toLocaleString() + ' products';
+    setStatus('ok','Ready');
+    showPage('scanner');
+    showToast(count.toLocaleString() + ' products loaded','ok');
+  } catch(err) {
+    document.getElementById('load-sub').innerHTML = '<span class="load-err">Failed: ' + err.message + '</span>';
+    setStatus('','Error');
+  }
+}
+
+// ── APP FLOW ──────────────────────────────────────────────────
+function startApp() {
+  currentStore = document.getElementById('inp-store').value;
+  if (!currentStore) { showToast('Please select a store','err'); return; }
+
+  document.getElementById('header').style.display = 'flex';
+  document.getElementById('header-store').textContent = currentStore;
+  document.getElementById('store-bar-name').textContent = STORE_NAMES[currentStore] || currentStore;
+  document.getElementById('store-bar-sub').textContent  = currentStore + ' · ' + Object.keys(products).length.toLocaleString() + ' products';
+
+  if (Object.keys(products).length === 0) {
+    showPage('loading');
+    loadData();
+  } else {
+    showPage('scanner');
+  }
+}
+
+function goSetup() {
+  stopScanner();
+  document.getElementById('header').style.display = 'none';
+  showPage('setup');
+}
+
+// ── LOOKUP ────────────────────────────────────────────────────
+function lookup(raw) {
+  const c  = String(raw).replace(/[\s\-]/g,'');
+  const s  = c.replace(/^0+/,'') || c;
+  const variants = [c, s, c.padStart(13,'0'), c.padStart(12,'0'), s.slice(0,-1), c.slice(0,-1)];
+  for (const v of variants) {
+    if (!v) continue;
+    if (products[v]) return products[v];
+    const vs = v.replace(/^0+/,'');
+    for (const [key,p] of Object.entries(products)) {
+      if (key.replace(/^0+/,'') === vs) return p;
+    }
+  }
+  return null;
+}
+
+// ── SCANNER ───────────────────────────────────────────────────
+function startScanner() {
+  document.getElementById('scanner-wrap').style.display  = 'block';
+  document.getElementById('btn-start-cam').style.display = 'none';
+  document.getElementById('btn-stop-cam').style.display  = 'block';
+  document.getElementById('scan-hint').style.display     = 'none';
+  setStatus('on','Scanning…');
+  html5QrCode = new Html5Qrcode('qr-reader');
+  html5QrCode.start(
+    {facingMode:'environment'},
+    {fps:15, qrbox:{width:280,height:110},
+     formatsToSupport:[Html5QrcodeSupportedFormats.EAN_13,Html5QrcodeSupportedFormats.EAN_8,Html5QrcodeSupportedFormats.UPC_A,Html5QrcodeSupportedFormats.UPC_E,Html5QrcodeSupportedFormats.CODE_128,Html5QrcodeSupportedFormats.CODE_39,Html5QrcodeSupportedFormats.ITF]},
+    decodedText => {
+      const now = Date.now();
+      if (decodedText === lastScanned && now - lastScanTime < 4000) return;
+      lastScanned = decodedText; lastScanTime = now;
+      showResult(decodedText);
+    }, ()=>{}
+  ).catch(()=>{ showToast('Camera error','err'); stopScanner(); });
+  scannerOn = true;
+}
+
+function stopScanner() {
+  if (html5QrCode && scannerOn) { html5QrCode.stop().then(()=>{ html5QrCode.clear(); html5QrCode=null; }).catch(()=>{}); scannerOn=false; }
+  document.getElementById('scanner-wrap').style.display  = 'none';
+  document.getElementById('btn-start-cam').style.display = 'block';
+  document.getElementById('btn-stop-cam').style.display  = 'none';
+  document.getElementById('scan-hint').style.display     = 'block';
+  setStatus('ok','Ready');
+}
+
+// ── RESULT ────────────────────────────────────────────────────
+function showResult(rawCode) {
+  const card  = document.getElementById('result-card');
+  const found = lookup(rawCode);
+  currentProduct = found;
+  currentCounts  = { fourup:0, sticker:0, orchi:0 };
+
+  if (!found) {
+    card.innerHTML = `
+      <div class="result-scanned">Scanned: ${rawCode}</div>
+      <div class="not-found-title">🚫 Not Found</div>
+      <div class="not-found-sub">Not in database.</div>
+      <div class="bottom-row"><button class="btn-next" onclick="scanNext()">▶ Scan Next</button></div>`;
+    card.className = 'result-card show miss';
+    showToast('Not found','err');
+    return;
+  }
+
+  card.innerHTML = `
+    <div class="result-scanned">Scanned: ${rawCode}</div>
+    <div class="result-brand">${found.brand}</div>
+    <div class="result-desc">${found.desc}</div>
+    <div class="pills">
+      <div><div class="pill-label">Dept</div><div class="pill dept">${found.dept}</div></div>
+      <div><div class="pill-label">Category</div><div class="pill cat">${found.cat}</div></div>
+      <div><div class="pill-label">Subcategory</div><div class="pill sub">${found.sub}</div></div>
+    </div>
+
+    <div class="inputs-row">
+      <div class="inp-wrap">
+        <label class="inp-label">Aisle</label>
+        <select class="inp" id="inp-aisle">
+          <option value="">—</option>
+          ${[...Array(13)].map((_,i)=>`<option value="${i+1}">${i+1}</option>`).join('')}
+        </select>
+      </div>
+      <div class="inp-wrap" style="flex:2">
+        <label class="inp-label">Remark</label>
+        <input class="inp" id="inp-remark" type="text" placeholder="optional…">
+      </div>
+    </div>
+
+    <div class="action-label">Tap to record — each tap = +1</div>
+    <div class="action-grid">
+      <button class="btn-action fourup"  onclick="pressAction('fourup')">
+        <span class="btn-icon">📋</span>
+        <span>Four-up</span>
+        <span class="btn-count" id="count-fourup">0</span>
+      </button>
+      <button class="btn-action sticker" onclick="pressAction('sticker')">
+        <span class="btn-icon">🏷</span>
+        <span>Sticker</span>
+        <span class="btn-count" id="count-sticker">0</span>
+      </button>
+      <button class="btn-action orchi"   onclick="pressAction('orchi')">
+        <span class="btn-icon">➕</span>
+        <span>I Added</span>
+        <span class="btn-count" id="count-orchi">0</span>
+      </button>
+      <button class="btn-action none"    onclick="pressAction('none')">
+        <span class="btn-icon">✕</span>
+        <span>None</span>
+        <span class="btn-count" style="color:var(--muted)">—</span>
+      </button>
+    </div>
+
+    <div class="bottom-row">
+      <button class="btn-photo" onclick="openPhotoCamera()">📷 Photo</button>
+      <button class="btn-next"  onclick="scanNext()">▶ Next</button>
+    </div>`;
+
+  card.className = 'result-card show';
+  showToast(found.cat,'ok');
+}
+
+// ── PRESS ACTION ──────────────────────────────────────────────
+async function pressAction(button) {
+  if (!currentProduct) return;
+
+  const aisle  = document.getElementById('inp-aisle')?.value  || '';
+  const remark = document.getElementById('inp-remark')?.value || '';
+  if (currentProduct) { currentProduct._aisle = aisle; currentProduct._remark = remark; }
+
+  if (button === 'none') {
+    // Just save aisle/remark
+    try {
+      await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({
+        action:'updateSheet', store:currentStore,
+        dept:currentProduct.dept, category:currentProduct.cat, subcategory:currentProduct.sub,
+        button:'none', aisle, remark
+      })});
+      showToast('Aisle/Remark saved','ok');
+    } catch(e) { showToast('Network error','err'); }
+    return;
+  }
+
+  // Optimistically update counter in UI
+  currentCounts[button] = (currentCounts[button] || 0) + 1;
+  const el = document.getElementById('count-' + button);
+  if (el) el.textContent = currentCounts[button];
+
+  try {
+    const resp = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({
+      action:'updateSheet', store:currentStore,
+      dept:currentProduct.dept, category:currentProduct.cat, subcategory:currentProduct.sub,
+      button, aisle, remark
+    })});
+    const result = await resp.json();
+    if (result.error) {
+      showToast('Error: ' + result.error,'err');
+      // Revert
+      currentCounts[button]--;
+      if (el) el.textContent = currentCounts[button];
+    } else {
+      // Sync with server count
+      if (result[button] !== undefined) {
+        currentCounts[button] = result[button === 'fourup' ? 'fourup' : button === 'sticker' ? 'sticker' : 'orchi'];
+        if (el) el.textContent = currentCounts[button];
+      }
+      const labels = { fourup:'Four-up', sticker:'Sticker', orchi:'I Added' };
+      showToast(labels[button] + ' → ' + currentCounts[button],'ok');
+    }
+  } catch(e) {
+    showToast('Network error','err');
+    currentCounts[button]--;
+    if (el) el.textContent = currentCounts[button];
+  }
+}
+
+// ── PHOTO ─────────────────────────────────────────────────────
+function buildFilename(p) {
+  const clean = s => String(s).trim().replace(/[\/\\:*?"<>|]/g,'').replace(/\s+/g,'_');
+  const base  = currentStore + '_' + clean(p.dept) + '_' + clean(p.cat) + '_' + clean(p.sub);
+  photoCounters[base] = (photoCounters[base] || 0) + 1;
+  return base + (photoCounters[base] > 1 ? '_' + photoCounters[base] : '') + '.jpg';
+}
+
+async function openPhotoCamera() {
+  if (!currentProduct) return;
+  const base = currentStore + '_' + currentProduct.dept.replace(/\s+/g,'_') + '_' + currentProduct.cat.replace(/\s+/g,'_') + '_' + currentProduct.sub.replace(/\s+/g,'_');
+  const previewNum = (photoCounters[base] || 0) + 1;
+  document.getElementById('photo-fname').textContent = base + (previewNum > 1 ? '_'+previewNum : '') + '.jpg';
+  try {
+    photoStream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}} });
+    document.getElementById('photo-video').srcObject = photoStream;
+    document.getElementById('photo-overlay').classList.add('show');
+  } catch(e) { document.getElementById('photo-input').click(); }
+}
+
+function closePhotoCamera() {
+  if (photoStream) { photoStream.getTracks().forEach(t=>t.stop()); photoStream=null; }
+  document.getElementById('photo-overlay').classList.remove('show');
+}
+
+async function capturePhoto() {
+  if (!currentProduct) return;
+  const video = document.getElementById('photo-video');
+  const canvas= document.getElementById('photo-canvas');
+  canvas.width = video.videoWidth||1280; canvas.height = video.videoHeight||720;
+  canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
+  const fname = buildFilename(currentProduct);
+  canvas.toBlob(async blob => {
+    const reader = new FileReader();
+    reader.onload = async e => {
+      const base64 = e.target.result.split(',')[1];
+      try {
+        const resp = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({
+          action:'uploadPhoto', store:currentStore, filename:fname, imageBase64:base64, mimeType:'image/jpeg'
+        })});
+        const r = await resp.json();
+        if (r.error) showToast('Upload error','err');
+        else showToast('📸 ' + fname,'ok');
+      } catch(e) { showToast('Upload failed','err'); }
+    };
+    reader.readAsDataURL(blob);
+  }, 'image/jpeg', 0.92);
+  closePhotoCamera();
+}
+
+function handlePhotoInput(input) {
+  if (!input.files[0] || !currentProduct) return;
+  const fname = buildFilename(currentProduct);
+  const reader = new FileReader();
+  reader.onload = async e => {
+    const base64 = e.target.result.split(',')[1];
+    try {
+      const resp = await fetch(SCRIPT_URL, { method:'POST', body: JSON.stringify({
+        action:'uploadPhoto', store:currentStore, filename:fname, imageBase64:base64, mimeType:'image/jpeg'
+      })});
+      const r = await resp.json();
+      if (r.error) showToast('Upload error','err');
+      else showToast('📸 ' + fname,'ok');
+    } catch(e) { showToast('Upload failed','err'); }
+  };
+  reader.readAsDataURL(input.files[0]);
+  input.value='';
+}
+
+function scanNext() {
+  document.getElementById('result-card').className='result-card';
+  document.getElementById('result-card').innerHTML='';
+  lastScanned=''; currentProduct=null; currentCounts={fourup:0,sticker:0,orchi:0};
+  if (!scannerOn) startScanner();
+}
+
+function showPage(n) { document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById('page-'+n).classList.add('active'); }
+function setStatus(s,t) { document.getElementById('status-txt').textContent=t; document.getElementById('dot').className='dot'+(s?' '+s:''); }
+function showToast(msg,type) { const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show'+(type?' '+type:''); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),2800); }
+</script>
+</body>
+</html>
