@@ -481,16 +481,17 @@ async function addProduct() {
 
   // Save to Google Sheet
   try {
+    // Use URLSearchParams — most reliable for Google Apps Script
+    const params = new URLSearchParams();
+    params.append('payload', JSON.stringify({
+      action:'addProduct', store:currentStore,
+      upc:entry.upc, desc:entry.desc, dept:entry.dept,
+      cat:entry.cat, sub:entry.sub, brand:entry.brand,
+      mda:entry.mda, remark:entry.remark
+    }));
     const resp = await fetch(SCRIPT_URL, {
       method:'POST',
-      redirect:'follow',
-      headers:{ 'Content-Type':'text/plain' },
-      body: JSON.stringify({
-        action:'addProduct', store:currentStore,
-        upc:entry.upc, desc:entry.desc, dept:entry.dept,
-        cat:entry.cat, sub:entry.sub, brand:entry.brand,
-        mda:entry.mda, remark:entry.remark
-      })
+      body: params
     });
     const result = await resp.json();
     if (result.status === 'added') showToast('✓ Added to sheet!','ok');
