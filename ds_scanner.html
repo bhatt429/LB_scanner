@@ -262,6 +262,13 @@ const ALL_DATA = {"BV": {"085746300606": {"upc": "085746300606", "dept": "LIQUOR
 
 let currentStore = '';
 let MASTER_DATA = {};  // loaded from uofm_data.json
+
+async function loadMasterData() {
+  try {
+    const resp = await fetch('uofm_data.json');
+    if (resp.ok) MASTER_DATA = await resp.json();
+  } catch(e) { console.warn('Master data failed:', e); }
+}
 let verifyScanner = null, verifyOn = false;
 let addScanner    = null, addOn    = false;
 let lastScanned   = '', lastScanTime = 0;
@@ -272,6 +279,8 @@ let addedProducts = [];
 function startApp() {
   currentStore = document.getElementById('inp-store').value;
   if (!currentStore) { showToast('Please select a store','err'); return; }
+  // Load master data in background if not already loaded
+  if (Object.keys(MASTER_DATA).length === 0) loadMasterData();
   document.getElementById('header').style.display = 'flex';
   document.getElementById('header-store').textContent = currentStore;
   const count = Object.keys(ALL_DATA[currentStore] || {}).length / 3; // divided by 3 variants
@@ -403,7 +412,12 @@ function startAddScanner() {
       el.classList.add('show');
       stopAddScanner();
 
-      // Auto-fill from DS data (search all stores)
+      // Auto-fill from master data
+      if (Object.keys(MASTER_DATA).length === 0) {
+        showToast('Still loading data, please wait…','err');
+        scannedUPC = '';
+        return;
+      }
       const found = lookupAny(decodedText);
       if (found) {
         document.getElementById('add-dept').value  = found.dept  || '';
@@ -412,9 +426,9 @@ function startAddScanner() {
         document.getElementById('add-desc').value  = found.desc  || '';
         document.getElementById('add-brand').value = found.brand || '';
         document.getElementById('add-mda').value   = found.mda   || 'MN Grown';
-        showToast('Product found — auto-filled!','ok');
+        showToast('Auto-filled!','ok');
       } else {
-        showToast('UPC captured — fill details manually','ok');
+        showToast('Not in master data — fill manually','ok');
       }
     }, ()=>{}
   ).catch(()=>{ showToast('Camera error','err'); stopAddScanner(); });
