@@ -392,7 +392,20 @@ function startAddScanner() {
       el.textContent = '📦 UPC: ' + decodedText;
       el.classList.add('show');
       stopAddScanner();
-      showToast('UPC captured','ok');
+
+      // Auto-fill from DS data
+      const found = lookup(decodedText);
+      if (found) {
+        document.getElementById('add-dept').value  = found.dept  || '';
+        document.getElementById('add-cat').value   = found.cat   || '';
+        document.getElementById('add-sub').value   = found.sub   || '';
+        document.getElementById('add-desc').value  = found.desc  || '';
+        document.getElementById('add-brand').value = found.brand || '';
+        document.getElementById('add-mda').value   = found.mda   || 'MN Grown';
+        showToast('Product found — auto-filled!','ok');
+      } else {
+        showToast('UPC captured — fill details manually','ok');
+      }
     }, ()=>{}
   ).catch(()=>{ showToast('Camera error','err'); stopAddScanner(); });
   addOn = true;
