@@ -483,6 +483,8 @@ async function addProduct() {
   try {
     const resp = await fetch(SCRIPT_URL, {
       method:'POST',
+      redirect:'follow',
+      headers:{ 'Content-Type':'text/plain' },
       body: JSON.stringify({
         action:'addProduct', store:currentStore,
         upc:entry.upc, desc:entry.desc, dept:entry.dept,
@@ -490,7 +492,9 @@ async function addProduct() {
         mda:entry.mda, remark:entry.remark
       })
     });
-    showToast('✓ Added to sheet!','ok');
+    const result = await resp.json();
+    if (result.status === 'added') showToast('✓ Added to sheet!','ok');
+    else showToast('Error: ' + (result.error || 'unknown'), 'err');
   } catch(e) {
     console.error('Sheet save failed', e);
     showToast('Added locally — sheet save failed','err');
